@@ -42,7 +42,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .single();
 
     if (data) {
-      set({ user: data, isOnboarded: !!data.nickname });
+      const user = data as unknown as User;
+      set({ user, isOnboarded: !!user.nickname });
     }
   },
 }));

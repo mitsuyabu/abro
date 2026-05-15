@@ -50,12 +50,13 @@ export default function OnboardingScreen() {
     try {
       const { error } = await supabase
         .from('users')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
           nickname: nickname.trim(),
           phase,
           interested_countries: countries,
           purposes,
-        })
+        } as any)
         .eq('id', session.user.id);
 
       if (error) throw error;

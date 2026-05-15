@@ -44,7 +44,7 @@ function AuthGuard() {
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/welcome');
-    } else if (session && !isOnboarded && !segments.includes('onboarding')) {
+    } else if (session && !isOnboarded && !(segments as string[]).includes('onboarding')) {
       router.replace('/(auth)/onboarding');
     } else if (session && isOnboarded && inAuthGroup) {
       router.replace('/(tabs)/chats');

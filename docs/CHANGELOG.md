@@ -1,5 +1,55 @@
 # CHANGELOG
 
+## Phase 1 / Prompt 03 完了 — 2026-05-15
+
+### 実装内容
+
+#### DB マイグレーション
+- `supabase/migrations/0002_chats_and_plans.sql`
+  - `chats` テーブル(チャットセッション + RLS)
+  - `messages` テーブル(チャットメッセージ + RLS)
+  - `plans` テーブル(留学プラン + RLS)
+  - `plan_items` テーブル(プラン要素 + RLS)
+
+#### Supabase Edge Function
+- `supabase/functions/ai-chat/index.ts` — Claude API ストリーミング + DB保存
+- `supabase/functions/ai-chat/system_prompt.ts` — ユーザーコンテキスト付きシステムプロンプト
+- モデル: `claude-haiku-4-5-20251001`(コスト効率重視)
+- SSE(Server-Sent Events)でリアルタイムストリーミング
+
+#### 状態管理 / フック
+- `stores/chat.ts` — Zustand chat store(メッセージ、ストリーミング状態)
+- `hooks/useChat.ts` — fetchChats / fetchMessages / sendMessage
+
+#### 画面
+- `app/(tabs)/chats.tsx` — Mindtrip 風ホーム(アクションチップ + 固定入力欄 + チャット履歴)
+- `app/chat/[id].tsx` — チャット画面(SSE ストリーミング + プランアイテム採用)
+- `app/plan/[id].tsx` — プラン詳細(要素一覧 + 費用合計 + 削除)
+
+#### コンポーネント
+- `components/chat/MessageBubble.tsx` — ユーザー/AI メッセージ気泡
+- `components/chat/TypingIndicator.tsx` — 3点リーダーアニメーション
+- `components/chat/PlanItemCard.tsx` — プラン要素カード(採用ボタン付き)
+
+### Edge Function のデプロイ手順(次のステップ)
+
+1. Supabase ダッシュボード → SQL Editor で `0002_chats_and_plans.sql` を実行
+2. [console.anthropic.com](https://console.anthropic.com) で API キーを取得
+3. Supabase ダッシュボード → Edge Functions → Secrets に `ANTHROPIC_API_KEY` を追加
+4. Supabase CLI でデプロイ:
+   ```bash
+   npx supabase functions deploy ai-chat
+   ```
+
+### 次のプロンプト(04: 費用シミュレーター)への申し送り
+
+- `plans` テーブルに `budget_jpy` カラムあり
+- `plan_items` に `cost_jpy` カラムあり → 合計算出済み
+- ホーム画面の「費用シミュレート」チップは `available: false` で枠だけ用意済み
+- Edge Function の `SUPABASE_URL` / `SUPABASE_ANON_KEY` は自動注入される
+
+---
+
 ## Phase 1 / Prompt 02 完了 — 2026-05-15
 
 ### 実装内容
