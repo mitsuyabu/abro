@@ -121,6 +121,39 @@ export interface CostItem {
   created_at: string;
 }
 
+// ─── ブックマーク ────────────────────────────────────────
+export type BookmarkSourceType = 'url' | 'image' | 'pdf' | 'note' | 'map_pin' | 'video';
+
+export interface Bookmark {
+  id: string;
+  user_id: string;
+  source_type: BookmarkSourceType;
+  source_url: string | null;
+  title: string | null;
+  description: string | null;
+  thumbnail_url: string | null;
+  content_text: string | null;
+  category: string;
+  tags: string[];
+  location: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  ai_classified: boolean;
+  ai_confidence: number | null;
+  plan_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookmarkCategory {
+  id: string;
+  user_id: string;
+  key: string;
+  label: string;
+  icon: string | null;
+  is_default: boolean;
+  order_index: number;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

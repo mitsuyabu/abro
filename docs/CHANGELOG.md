@@ -1,5 +1,70 @@
 # CHANGELOG
 
+## Phase 1 / Prompt 05 完了 — 2026-05-15
+
+### 実装内容
+
+#### DB マイグレーション
+- `supabase/migrations/0004_bookmarks.sql`
+  - `CREATE EXTENSION IF NOT EXISTS vector;` を先頭で有効化
+  - `bookmarks` テーブル(embedding VECTOR(1536) 含む + RLS)
+  - `bookmark_categories` テーブル(ユーザーごとのカスタムカテゴリ + RLS)
+  - `updated_at` 自動更新トリガー
+  - 新規ユーザー作成時にデフォルト 12 カテゴリを自動挿入するトリガー
+  - ※ `ivfflat` インデックスはデータが溜まってから手動追加(コメントアウト済み)
+
+#### 型 / 定数
+- `types/index.ts` — `BookmarkSourceType`, `Bookmark`, `BookmarkCategory` 追加
+- `lib/bookmark/defaults.ts` — `DEFAULT_CATEGORIES`, `getCategoryIcon`, `getCategoryLabel`, `SOURCE_TYPE_ICONS`
+
+#### 状態管理 / フック
+- `stores/bookmark.ts` — Zustand ブックマークストア
+- `hooks/useBookmarks.ts` — fetchBookmarks / createFromUrl / createFromNote / createFromImage / updateCategory / deleteBookmark / ensureCategories(既存ユーザー対応)
+
+#### Supabase Edge Functions
+- `supabase/functions/extract-url/index.ts`
+  - YouTube/TikTok: oEmbed API でタイトル・サムネイル取得
+  - 一般URL: OGP タグ (og:title / og:description / og:image) 取得
+  - タイムアウト 8 秒
+- `supabase/functions/classify-bookmark/index.ts`
+  - claude-haiku-4-5-20251001 で AI 分類
+  - カテゴリ・信頼度(0-1)・タグ・サマリを返す
+  - SUPABASE_SERVICE_ROLE_KEY で bookmarks テーブルを直接更新
+  - ANTHROPIC_API_KEY 未設定時は 200 で `category: 'others'` を返す(フォールバック)
+
+#### コンポーネント
+- `components/bookmark/AddBookmarkModal.tsx` — URL/画像/メモの 3 種入力方法モーダル
+- `components/bookmark/BookmarkCard.tsx` — グリッドカード(サムネイル or カラー背景 + AI 分類ステータス)
+- `components/bookmark/CategoryTabs.tsx` — 横スクロールカテゴリフィルタ(件数バッジ付き)
+
+#### 画面
+- `app/(tabs)/saved.tsx` — カテゴリ別グリッド表示 + AI 提案カード + 保存ステータス Toast
+- `app/bookmark/[id].tsx` — 詳細画面(サムネイル / AI サマリ / タグ / カテゴリ変更 / URL 開く / 削除)
+
+#### 既存画面の変更
+- `app/(tabs)/chats.tsx` — 「📌 情報を保存」チップを有効化 → saved タブへ遷移
+
+### AI 分類の仕様
+- URL 保存 → extract-url で OGP 取得 → classify-bookmark でカテゴリ判定 → DB 更新
+- 分類は非同期(保存後バックグラウンドで実行)、保存直後は `ai_classified: false`
+- 信頼度 < 0.6 の場合は UI で「⚠️ 仮分類」と表示
+- ユーザーはカテゴリを手動変更可能
+
+### 既知の制限・将来対応
+- 画像 OCR (Claude Vision) は将来フェーズ(現在は alt/note テキストのみ)
+- PDF 対応(expo-document-picker + Storage)は将来フェーズ
+- ベクトル検索(embedding 生成)は将来フェーズ — カラムとインデックス枠は用意済み
+- iOS 共有エクステンションは Phase 2
+- 地図ビュー(react-native-maps)は将来フェーズ
+- Edge Functions デプロイ手順: `npx supabase functions deploy extract-url classify-bookmark`
+- 「classify-bookmark」は `SUPABASE_SERVICE_ROLE_KEY` も Secrets に追加が必要
+
+### 次のプロンプト(06: 親子タスク)への申し送り
+- `bookmark_categories` はユーザーごとに 12 カテゴリが自動生成済み
+- 既存ユーザーは `ensureCategories()` で初回アクセス時に自動補完
+
+---
+
 ## Phase 1 / Prompt 04 完了 — 2026-05-15
 
 ### 実装内容
