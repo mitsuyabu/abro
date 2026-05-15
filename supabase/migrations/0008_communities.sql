@@ -21,11 +21,7 @@ CREATE INDEX idx_communities_official ON public.communities(is_official DESC, me
 ALTER TABLE public.communities ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "communities_select" ON public.communities FOR SELECT USING (true);
 CREATE POLICY "communities_insert" ON public.communities FOR INSERT WITH CHECK (created_by = auth.uid());
-CREATE POLICY "communities_update" ON public.communities
-  FOR UPDATE USING (
-    created_by = auth.uid() OR
-    EXISTS (SELECT 1 FROM public.community_members WHERE community_id = id AND user_id = auth.uid() AND role IN ('owner','admin'))
-  );
+-- communities_update は community_members 作成後に追加する
 
 -- ── コミュニティメンバー ─────────────────────────────────────────────────
 CREATE TABLE public.community_members (
@@ -60,6 +56,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER trg_community_member_count
   AFTER INSERT OR DELETE ON public.community_members
   FOR EACH ROW EXECUTE FUNCTION public.update_community_member_count();
+
+-- communities_update: community_members が存在するここで追加
+CREATE POLICY "communities_update" ON public.communities
+  FOR UPDATE USING (
+    created_by = auth.uid() OR
+    EXISTS (SELECT 1 FROM public.community_members WHERE community_id = id AND user_id = auth.uid() AND role IN ('owner','admin'))
+  );
 
 -- ── コミュニティ投稿 ─────────────────────────────────────────────────────
 CREATE TABLE public.community_posts (
