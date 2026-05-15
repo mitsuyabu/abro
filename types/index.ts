@@ -298,6 +298,47 @@ export interface DmMessage {
   created_at: string;
 }
 
+// ─── コミュニティ ─────────────────────────────────────────
+export type CommunityType = 'city' | 'school' | 'purpose' | 'custom';
+export type CommunityMemberRole = 'owner' | 'admin' | 'member';
+
+export interface Community {
+  id: string;
+  name: string;
+  description: string | null;
+  type: CommunityType;
+  is_official: boolean;
+  cover_emoji: string;
+  city: string | null;
+  country: string | null;
+  member_count: number;
+  post_count: number;
+  created_by: string | null;
+  created_at: string;
+  is_member?: boolean;
+  my_role?: CommunityMemberRole | null;
+}
+
+export interface CommunityMember {
+  community_id: string;
+  user_id: string;
+  role: CommunityMemberRole;
+  joined_at: string;
+}
+
+export interface CommunityPost {
+  id: string;
+  community_id: string;
+  user_id: string;
+  content: string;
+  like_count: number;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  user?: Pick<User, 'id' | 'nickname' | 'avatar_url' | 'phase'>;
+  liked_by_me?: boolean;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {
