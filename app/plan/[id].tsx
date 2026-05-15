@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
+import { CostSimulatorSheet } from '@/components/cost/CostSimulatorSheet';
 import { supabase } from '@/lib/supabase';
+import { useCostSimulation } from '@/hooks/useCostSimulation';
+import { useCostStore } from '@/stores/cost';
 import type { Plan, PlanItem, PlanItemType } from '@/types';
 
 const ITEM_ICONS: Record<PlanItemType, string> = {
@@ -41,6 +44,9 @@ export default function PlanScreen() {
   const [items, setItems] = useState<PlanItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const { fetchOrCreateByPlan, showSheet } = useCostSimulation();
+  const costSimulation = useCostStore((s) => s.simulation);
+
   useEffect(() => {
     if (!id) return;
     fetchPlan();
@@ -57,6 +63,12 @@ export default function PlanScreen() {
     if (planData) setPlan(planData as Plan);
     if (itemsData) setItems(itemsData as PlanItem[]);
     setIsLoading(false);
+  };
+
+  const handleOpenCostSimulator = async () => {
+    if (!id) return;
+    await fetchOrCreateByPlan(id);
+    showSheet();
   };
 
   const handleDeleteItem = async (itemId: string, title: string) => {
@@ -95,8 +107,16 @@ export default function PlanScreen() {
     );
   }
 
+  const durationMonths = plan?.duration_weeks ? Math.ceil(plan.duration_weeks / 4) : undefined;
+
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* コストシミュレーターシート */}
+      <CostSimulatorSheet
+        planDestination={[plan?.destination_country, plan?.destination_city].filter(Boolean).join(' / ') || undefined}
+        planDurationMonths={durationMonths}
+      />
+
       {/* ヘッダー */}
       <View className="flex-row items-center px-4 py-3 border-b border-border">
         <Pressable
@@ -187,6 +207,13 @@ export default function PlanScreen() {
 
         {/* アクション */}
         <View className="gap-2 pt-2">
+          <Pressable
+            className="bg-primary rounded-xl py-3 items-center active:opacity-80"
+            onPress={handleOpenCostSimulator}
+            accessibilityLabel="費用シミュレーターを開く"
+          >
+            <Text className="text-white text-sm font-semibold">💰 費用をシミュレートする</Text>
+          </Pressable>
           <Pressable
             className="border border-border rounded-xl py-3 items-center active:opacity-60"
             onPress={() => router.back()}

@@ -1,5 +1,57 @@
 # CHANGELOG
 
+## Phase 1 / Prompt 04 完了 — 2026-05-15
+
+### 実装内容
+
+#### DB マイグレーション
+- `supabase/migrations/0003_cost_simulations.sql`
+  - `cost_simulations` テーブル(プラン単位のシミュレーション + RLS)
+  - `cost_items` テーブル(費用項目 + カテゴリ制約 + RLS)
+  - `updated_at` 自動更新トリガー
+
+#### 型 / 定数
+- `types/index.ts` — `CostFrequency`, `CostCategory`, `CostSimulation`, `CostItem` 追加
+- `lib/cost/defaults.ts` — `COST_CATEGORIES`, `FREQUENCY_LABELS`, `PLAN_ITEM_TYPE_TO_CATEGORY`
+- `lib/cost/calculate.ts` — `calculateTotalJpy`, `itemTotalJpy`, `formatJpy`, `buildShareText`
+
+#### 状態管理 / フック
+- `stores/cost.ts` — Zustand コストストア(simulation/items/isSheetVisible)
+- `hooks/useCostSimulation.ts` — createSimulation / fetchSimulation / fetchOrCreateByPlan / addItem / updateItem / deleteItem
+
+#### コンポーネント
+- `components/cost/CostSimulatorSheet.tsx` — ハーフモーダルシート(Animated.View スライドアップ + 合計 + 項目リスト + 共有)
+- `components/cost/CostItemRow.tsx` — タップ展開で金額・頻度・期間を編集、Alert で削除確認
+- `components/cost/AddItemModal.tsx` — 新規項目追加モーダル(カテゴリ選択 + 金額 + 頻度 + 期間)
+
+#### 画面の変更
+- `app/(tabs)/chats.tsx` — 「💰 費用シミュレート」チップを有効化(available: true)、cost_simulation モードでチャット画面へ
+- `app/chat/[id].tsx`
+  - `mode=cost_simulation` 対応: 自動でシミュ作成 → シートをオープン
+  - ヘッダーに「💰 費用」ボタン追加(シミュ存在時)
+  - 入力欄上にミニバー(シート非表示 + 項目あり時に合計を常時表示)
+  - プラン取得後に `fetchOrCreateByPlan` で既存シミュを自動ロード
+- `app/plan/[id].tsx`
+  - 「💰 費用をシミュレートする」ボタンを追加
+  - `CostSimulatorSheet` をプラン情報(渡航先・期間)付きで表示
+
+### 共有機能
+- React Native 標準 `Share.share()` を使用(iOS/Android/Web 対応)
+- 「📤 共有する」「👨‍👩‍👧 親に送る」ボタン(両方とも Share.share を起動)
+- 共有テキストに内訳・合計・Abro リンクを含む
+
+### 既知の制限
+- 為替対応は将来フェーズ(データモデルは `exchange_rates JSONB` で準備済み)
+- 親アカウント連携未実装(「親に送る」は現状 Share.share と同じ挙動)
+- AI → cost_items 自動反映トリガーは次フェーズに延期(plan_items 採用時の手動追加で代替)
+- `@gorhom/bottom-sheet` は Reanimated 4 互換性リスクのため採用せず、`Animated.View` + Modal で代替実装
+
+### 次のプロンプト(05: AI ブックマーク)への申し送り
+- `cost_simulations.plan_id` で plan と 1:1 紐付け
+- `fetchOrCreateByPlan(planId)` で Plan 画面 / Chat 画面から透過的に呼び出し可能
+
+---
+
 ## Phase 1 / Prompt 03 完了 — 2026-05-15
 
 ### 実装内容

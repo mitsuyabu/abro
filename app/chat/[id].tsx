@@ -14,23 +14,32 @@ import {
 
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { CostSimulatorSheet } from '@/components/cost/CostSimulatorSheet';
 import { supabase } from '@/lib/supabase';
 import { useChatStore } from '@/stores/chat';
+import { useCostStore } from '@/stores/cost';
 import { useChat } from '@/hooks/useChat';
+import { useCostSimulation } from '@/hooks/useCostSimulation';
+import { calculateTotalJpy, formatJpy } from '@/lib/cost/calculate';
 import type { Message, StructuredContent } from '@/types';
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { id, initialMessage } = useLocalSearchParams<{ id: string; initialMessage?: string }>();
+  const { id, initialMessage, mode } = useLocalSearchParams<{ id: string; initialMessage?: string; mode?: string }>();
   const isNew = id === 'new';
+  const isCostMode = mode === 'cost_simulation';
 
   const { messages, streamingMessage, isLoading, currentChatId } = useChatStore();
   const { fetchMessages, sendMessage } = useChat();
+  const { simulation, isSheetVisible, showSheet, createSimulation, fetchOrCreateByPlan } = useCostSimulation();
+  const costItems = useCostStore((s) => s.items);
+  const costTotal = calculateTotalJpy(costItems);
 
   const [inputText, setInputText] = useState('');
   const [hasPlan, setHasPlan] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const didSendInitial = useRef(false);
+  const didInitCost = useRef(false);
 
   useEffect(() => {
     if (!isNew && id) {
@@ -48,7 +57,15 @@ export default function ChatScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // プランが存在するか確認
+  // コストモード: シミュレーターを初期化して自動表示
+  useEffect(() => {
+    if (!isCostMode || didInitCost.current) return;
+    didInitCost.current = true;
+    createSimulation().then(() => showSheet());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // プランが存在するか確認 + プランに紐づくシミュ取得
   useEffect(() => {
     const chatId = currentChatId ?? (isNew ? undefined : id);
     if (!chatId) return;
@@ -59,7 +76,15 @@ export default function ChatScreen() {
       .eq('id', chatId)
       .single()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then(({ data }) => setHasPlan(!!(data as any)?.plan_id));
+      .then(({ data }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const planId = (data as any)?.plan_id;
+        setHasPlan(!!planId);
+        if (planId && !simulation) {
+          fetchOrCreateByPlan(planId);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentChatId, id, isNew, messages.length]);
 
   const handleSend = useCallback(async () => {
@@ -133,6 +158,9 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* コストシミュレーターシート */}
+      <CostSimulatorSheet />
+
       {/* ヘッダー */}
       <View className="flex-row items-center px-4 py-3 border-b border-border">
         <Pressable
@@ -145,28 +173,39 @@ export default function ChatScreen() {
         <Text className="flex-1 text-center text-primary font-semibold text-sm" numberOfLines={1}>
           AI アドバイザー
         </Text>
-        {hasPlan && chatId && (
-          <Pressable
-            className="active:opacity-60"
-            onPress={() => {
-              supabase
-                .from('chats')
-                .select('plan_id')
-                .eq('id', chatId)
-                .single()
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .then(({ data }) => {
+        <View className="flex-row items-center gap-2">
+          {(isCostMode || simulation) && (
+            <Pressable
+              className="active:opacity-60"
+              onPress={showSheet}
+              accessibilityLabel="費用シミュレーターを開く"
+            >
+              <Text className="text-sm text-primary font-medium">💰 費用</Text>
+            </Pressable>
+          )}
+          {hasPlan && chatId && (
+            <Pressable
+              className="active:opacity-60"
+              onPress={() => {
+                supabase
+                  .from('chats')
+                  .select('plan_id')
+                  .eq('id', chatId)
+                  .single()
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const planId = (data as any)?.plan_id;
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  if (planId) router.push(`/plan/${planId}` as any);
-                });
-            }}
-            accessibilityLabel="プランを見る"
-          >
-            <Text className="text-sm text-primary font-medium">📋 プラン</Text>
-          </Pressable>
-        )}
+                  .then(({ data }) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const planId = (data as any)?.plan_id;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    if (planId) router.push(`/plan/${planId}` as any);
+                  });
+              }}
+              accessibilityLabel="プランを見る"
+            >
+              <Text className="text-sm text-primary font-medium">📋 プラン</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -203,6 +242,18 @@ export default function ChatScreen() {
           }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
+
+        {/* コストミニバー(シミュレーターが非表示かつ項目あり) */}
+        {simulation && costItems.length > 0 && !isSheetVisible && (
+          <Pressable
+            className="flex-row items-center justify-between px-4 py-2 bg-primary/10 border-t border-primary/20 active:opacity-70"
+            onPress={showSheet}
+            accessibilityLabel="費用シミュレーターを開く"
+          >
+            <Text className="text-xs text-primary font-medium">💰 費用シミュレーター</Text>
+            <Text className="text-xs font-bold text-primary">{formatJpy(costTotal)}</Text>
+          </Pressable>
+        )}
 
         {/* 入力欄 */}
         <View className="px-4 py-3 border-t border-border">

@@ -90,6 +90,37 @@ export interface PlanItem {
   created_at: string;
 }
 
+// ─── 費用シミュレーター ──────────────────────────────────
+export type CostFrequency = 'once' | 'monthly' | 'weekly' | 'daily';
+export type CostCategory =
+  | 'visa' | 'tuition' | 'flight' | 'accommodation'
+  | 'food' | 'transport' | 'insurance' | 'phone'
+  | 'pocket_money' | 'reserve' | 'other';
+
+export interface CostSimulation {
+  id: string;
+  plan_id: string | null;
+  user_id: string;
+  currency: string;
+  exchange_rates: Record<string, number> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CostItem {
+  id: string;
+  simulation_id: string;
+  category: CostCategory;
+  label: string;
+  amount_jpy: number;
+  frequency: CostFrequency;
+  duration: number;
+  note: string | null;
+  is_estimated: boolean;
+  order_index: number;
+  created_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

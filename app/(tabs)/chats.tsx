@@ -18,7 +18,7 @@ import type { Chat } from '@/types';
 
 const ACTION_CHIPS = [
   { id: 'plan', emoji: '✨', label: 'プランを作る', prompt: 'どんな留学・ワーホリを考えていますか？目的・期間・予算を教えてください。', available: true },
-  { id: 'cost', emoji: '💰', label: '費用シミュレート', prompt: '', available: false },
+  { id: 'cost', emoji: '💰', label: '費用シミュレート', prompt: '留学・ワーホリの費用をシミュレーションしたいです。まず渡航先と滞在期間を教えてください。', available: true },
   { id: 'save', emoji: '📌', label: '情報を保存', prompt: '', available: false },
   { id: 'senpai', emoji: '👥', label: '先輩に質問', prompt: '', available: false },
   { id: 'agent', emoji: '🎓', label: 'エージェント相談', prompt: '', available: false },
@@ -66,8 +66,15 @@ export default function ChatsScreen() {
     if (!chip.available) {
       return;
     }
+    if (chip.id === 'cost') {
+      useChatStore.getState().reset();
+      useChatStore.getState().setMessages([]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.push({ pathname: '/chat/[id]' as any, params: { id: 'new', initialMessage: chip.prompt, mode: 'cost_simulation' } });
+      return;
+    }
     handleSend(chip.prompt);
-  }, [handleSend]);
+  }, [handleSend, router]);
 
   const handleChatPress = useCallback((chat: Chat) => {
     useChatStore.getState().reset();
