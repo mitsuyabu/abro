@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 
+import { AffiliateSection } from '@/components/booking/AffiliateCard';
 import { Card } from '@/components/ui/Card';
 import { CostSimulatorSheet } from '@/components/cost/CostSimulatorSheet';
 import { supabase } from '@/lib/supabase';
@@ -204,6 +205,9 @@ export default function PlanScreen() {
             ))
           )}
         </View>
+
+        {/* アフィリエイト */}
+        <AffiliateSection planId={id} />
 
         {/* アクション */}
         <View className="gap-2 pt-2">

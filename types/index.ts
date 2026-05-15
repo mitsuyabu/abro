@@ -405,6 +405,35 @@ export interface QaAnswer {
   voted_by_me?: boolean;
 }
 
+// ─── 予約・アフィリエイト ─────────────────────────────────
+export type BookingType = 'flight' | 'accommodation' | 'school' | 'insurance' | 'activity' | 'transfer' | 'other';
+export type BookingStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface Booking {
+  id: string;
+  user_id: string;
+  plan_id: string | null;
+  provider: string;
+  type: BookingType;
+  title: string;
+  amount_jpy: number | null;
+  currency: string;
+  booked_at: string | null;
+  notes: string | null;
+  status: BookingStatus;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AffiliateClick {
+  id: string;
+  user_id: string | null;
+  plan_id: string | null;
+  provider: string;
+  clicked_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

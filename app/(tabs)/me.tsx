@@ -127,7 +127,7 @@ export default function MeScreen() {
           </Pressable>
         </Card>
 
-        {/* DM */}
+        {/* DM / 予約 */}
         <Card className="gap-0">
           <Pressable
             className="flex-row items-center justify-between py-1 active:opacity-70"
@@ -135,6 +135,15 @@ export default function MeScreen() {
             accessibilityLabel="ダイレクトメッセージ"
           >
             <Text className="text-sm font-semibold text-primary">💬 ダイレクトメッセージ</Text>
+            <Text className="text-muted text-sm">›</Text>
+          </Pressable>
+          <View className="h-px bg-border my-2" />
+          <Pressable
+            className="flex-row items-center justify-between py-1 active:opacity-70"
+            onPress={() => router.push('/bookings' as never)}
+            accessibilityLabel="予約管理"
+          >
+            <Text className="text-sm font-semibold text-primary">🗒️ 予約管理</Text>
             <Text className="text-muted text-sm">›</Text>
           </Pressable>
         </Card>
