@@ -184,6 +184,61 @@ export interface Task {
   created_at: string;
 }
 
+// ─── エージェント ────────────────────────────────────────
+export type AgentPlan = 'basic' | 'premium' | 'enterprise';
+export type CollaboratorRole = 'agent' | 'friend' | 'parent';
+export type CollaboratorPermission = 'view' | 'suggest' | 'edit';
+
+export interface Agent {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  description: string | null;
+  specialties: string[];
+  countries: string[];
+  rating: number;
+  review_count: number;
+  plan: AgentPlan;
+  created_at: string;
+}
+
+export interface AgentCounselor {
+  id: string;
+  agent_id: string;
+  user_id: string | null;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+  specialties: string[];
+  languages: string[];
+  years_experience: number | null;
+  is_online: boolean;
+  rating: number;
+  review_count: number;
+  created_at: string;
+}
+
+export interface AgentReview {
+  id: string;
+  agent_id: string | null;
+  counselor_id: string | null;
+  reviewer_id: string;
+  rating: number;
+  comment: string | null;
+  verified: boolean;
+  created_at: string;
+}
+
+export interface PlanCollaborator {
+  id: string;
+  plan_id: string;
+  collaborator_user_id: string;
+  role: CollaboratorRole;
+  permission: CollaboratorPermission;
+  invited_at: string;
+  accepted_at: string | null;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

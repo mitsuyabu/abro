@@ -21,7 +21,7 @@ const ACTION_CHIPS = [
   { id: 'cost', emoji: '💰', label: '費用シミュレート', prompt: '留学・ワーホリの費用をシミュレーションしたいです。まず渡航先と滞在期間を教えてください。', available: true },
   { id: 'save', emoji: '📌', label: '情報を保存', prompt: '', available: true },
   { id: 'senpai', emoji: '👥', label: '先輩に質問', prompt: '', available: false },
-  { id: 'agent', emoji: '🎓', label: 'エージェント相談', prompt: '', available: false },
+  { id: 'agent', emoji: '🎓', label: 'エージェント相談', prompt: '', available: true },
 ] as const;
 
 function formatRelativeTime(dateStr: string): string {
@@ -76,6 +76,11 @@ export default function ChatsScreen() {
     if (chip.id === 'save') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       router.push('/(tabs)/saved' as any);
+      return;
+    }
+    if (chip.id === 'agent') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.push('/agents' as any);
       return;
     }
     handleSend(chip.prompt);

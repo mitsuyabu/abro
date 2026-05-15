@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## Phase 1 / Prompt 07 完了 — 2026-05-15 🎉 Phase 1 MVP 完了
+
+### 実装内容
+
+#### DB マイグレーション
+- `supabase/migrations/0006_agents.sql`
+  - `agents` テーブル(エージェント会社 + RLS)
+  - `agent_counselors` テーブル(カウンセラー + オンライン状態 + RLS)
+  - `agent_reviews` テーブル(1ユーザー1カウンセラー1レビュー制約 + RLS)
+  - `plan_collaborators` テーブル(プラン共同編集招待 + RLS)
+  - `plan_changes` テーブル(プラン編集提案履歴 + RLS)
+  - `users.is_agent` カラム追加
+- `supabase/migrations/0006b_agents_seed.sql`
+  - デモ用エージェント 3 社 + カウンセラー 4 名のサンプルデータ
+
+#### 型
+- `types/index.ts` — `Agent`, `AgentCounselor`, `AgentReview`, `PlanCollaborator` 追加
+
+#### 画面
+- `app/agents/index.tsx` — エージェント一覧(検索 + 国フィルタ + オンライン中カウンセラー横スクロール)
+- `app/agents/[id].tsx` — エージェント詳細(会社情報 + カウンセラー一覧 + レビュー)
+- `app/agents/counselor/[id].tsx` — カウンセラー詳細(プロフィール + 即時チャット + レビュー投稿)
+- `app/(tabs)/explore.tsx` — 探すタブをエージェント一覧に刷新
+
+#### 既存画面の変更
+- `app/(tabs)/chats.tsx` — 「🎓 エージェント相談」チップを有効化 → `/agents` へ遷移
+- `app/plan/[id].tsx` — 「エージェントに相談・招待する」ボタン追加
+
+### 機能詳細
+- **即時チャット**: オンラインのカウンセラーは「💬 今すぐ話す」で `chats.type='agent'` チャットを作成
+- **レビュー**: 1カウンセラーにつき1ユーザー1レビュー(DB の UNIQUE 制約)
+- **AI ファーストタッチ**: 将来フェーズ(Phase 2)で実装予定
+- **プラン共同編集 UI**: DB・RLS 設計済み、UI は Phase 2 で実装
+
+### 既知の制限・将来対応
+- Realtime メッセージング(カウンセラー↔ユーザー間のリアルタイム同期)は Phase 2
+- AI ファーストタッチ(初回 AI 応答 → カウンセラー引継ぎ)は Phase 2
+- プッシュ通知(新着メッセージ、マイルストーン達成)は Phase 2
+- エージェント側 UI(担当プラン一覧・着信チャット)は Phase 4
+- 面談予約システムは Phase 2
+
+---
+
 ## Phase 1 / Prompt 06 完了 — 2026-05-15
 
 ### 実装内容

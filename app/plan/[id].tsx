@@ -222,6 +222,13 @@ export default function PlanScreen() {
             <Text className="text-primary text-sm font-medium">チャットに戻る</Text>
           </Pressable>
           <Pressable
+            className="border border-border rounded-xl py-3 items-center active:opacity-70"
+            onPress={() => router.push('/agents' as never)}
+            accessibilityLabel="エージェントを招待する"
+          >
+            <Text className="text-primary text-sm font-medium">🎓 エージェントに相談・招待する</Text>
+          </Pressable>
+          <Pressable
             className="border border-border rounded-xl py-3 items-center opacity-40"
             accessibilityLabel="公開する(準備中)"
           >
