@@ -461,6 +461,40 @@ export interface CreatorEarning {
   paid_at: string | null;
 }
 
+// ─── 家計簿 ──────────────────────────────────────────────
+export type FinanceProvider = 'wise' | 'revolut' | 'manual' | 'other';
+export type TransactionCategory =
+  | 'food' | 'transport' | 'accommodation' | 'school' | 'insurance'
+  | 'phone' | 'entertainment' | 'shopping' | 'medical' | 'transfer' | 'other';
+
+export interface FinancialAccount {
+  id: string;
+  user_id: string;
+  provider: FinanceProvider;
+  label: string;
+  currency: string;
+  balance: number | null;
+  last_synced: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FinancialTransaction {
+  id: string;
+  account_id: string;
+  user_id: string;
+  amount_local: number;
+  currency: string;
+  amount_jpy: number | null;
+  category: TransactionCategory;
+  merchant: string | null;
+  note: string | null;
+  date: string;
+  ai_categorized: boolean;
+  created_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

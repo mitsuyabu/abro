@@ -155,6 +155,15 @@ export default function MeScreen() {
             <Text className="text-sm font-semibold text-primary">💰 クリエイター</Text>
             <Text className="text-muted text-sm">›</Text>
           </Pressable>
+          <View className="h-px bg-border my-2" />
+          <Pressable
+            className="flex-row items-center justify-between py-1 active:opacity-70"
+            onPress={() => router.push('/finance' as never)}
+            accessibilityLabel="家計簿"
+          >
+            <Text className="text-sm font-semibold text-primary">📒 家計簿</Text>
+            <Text className="text-muted text-sm">›</Text>
+          </Pressable>
         </Card>
 
         {/* サインアウト */}
