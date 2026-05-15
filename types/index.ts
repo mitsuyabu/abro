@@ -10,6 +10,9 @@ export interface User {
   purposes: string[];
   avatar_url: string | null;
   bio: string | null;
+  followers_count: number;
+  following_count: number;
+  posts_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -237,6 +240,62 @@ export interface PlanCollaborator {
   permission: CollaboratorPermission;
   invited_at: string;
   accepted_at: string | null;
+}
+
+// ─── SNS ─────────────────────────────────────────────────
+export type PostVisibility = 'public' | 'phase_only' | 'community_only';
+
+export interface Post {
+  id: string;
+  user_id: string;
+  content: string;
+  media_urls: string[];
+  location: Record<string, unknown> | null;
+  visibility: PostVisibility;
+  user_phase: string | null;
+  like_count: number;
+  comment_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PostWithUser extends Post {
+  user: Pick<User, 'id' | 'nickname' | 'avatar_url' | 'phase'>;
+  liked_by_me: boolean;
+}
+
+export interface PostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user?: Pick<User, 'id' | 'nickname' | 'avatar_url'>;
+}
+
+export interface Follow {
+  follower_id: string;
+  following_id: string;
+  created_at: string;
+}
+
+export interface DmThread {
+  id: string;
+  participant_a: string;
+  participant_b: string;
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  created_at: string;
+  other_user?: Pick<User, 'id' | 'nickname' | 'avatar_url'>;
+}
+
+export interface DmMessage {
+  id: string;
+  thread_id: string;
+  sender_id: string;
+  content: string;
+  read_at: string | null;
+  created_at: string;
 }
 
 // ─── Supabase DB 型 ──────────────────────────────────────

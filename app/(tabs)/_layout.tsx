@@ -43,8 +43,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
-          title: '探す',
-          tabBarIcon: () => <TabIcon emoji="🔍" />,
+          title: 'タイムライン',
+          tabBarIcon: () => <TabIcon emoji="🌏" />,
         }}
       />
       <Tabs.Screen

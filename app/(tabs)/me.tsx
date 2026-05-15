@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Alert, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { useEffect, useState } from 'react';
 
@@ -17,6 +18,7 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 export default function MeScreen() {
+  const router = useRouter();
   const { user, signOut } = useAuthStore();
   const { myLinks, fetchMyLinks, revokeLink } = useParentLink();
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -52,7 +54,11 @@ export default function MeScreen() {
 
         {/* プロフィールカード */}
         <Card className="gap-4">
-          <View className="flex-row items-center gap-4">
+          <Pressable
+            className="flex-row items-center gap-4 active:opacity-70"
+            onPress={() => user && router.push(`/profile/${user.id}` as never)}
+            accessibilityLabel="プロフィールを見る"
+          >
             <Avatar uri={user?.avatar_url} nickname={user?.nickname} size="lg" />
             <View className="flex-1 gap-1">
               <Text className="text-lg font-bold text-primary">
@@ -66,7 +72,8 @@ export default function MeScreen() {
                 />
               )}
             </View>
-          </View>
+            <Text className="text-muted">›</Text>
+          </Pressable>
 
           {user?.interested_countries && user.interested_countries.length > 0 && (
             <View className="gap-2">
@@ -117,6 +124,18 @@ export default function MeScreen() {
             <Text className="text-primary text-sm font-medium">
               {activeLinks.length > 0 ? '+ さらに連携する' : '親子連携を設定する'}
             </Text>
+          </Pressable>
+        </Card>
+
+        {/* DM */}
+        <Card className="gap-0">
+          <Pressable
+            className="flex-row items-center justify-between py-1 active:opacity-70"
+            onPress={() => router.push('/dm' as never)}
+            accessibilityLabel="ダイレクトメッセージ"
+          >
+            <Text className="text-sm font-semibold text-primary">💬 ダイレクトメッセージ</Text>
+            <Text className="text-muted text-sm">›</Text>
           </Pressable>
         </Card>
 
