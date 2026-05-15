@@ -1,35 +1,67 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import { Platform, Text } from 'react-native';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+function TabIcon({ emoji }: { emoji: string }) {
+  return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
+}
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E8E8E8',
+          borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 88 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          paddingTop: 8,
+        },
+        tabBarActiveTintColor: '#1A1A1A',
+        tabBarInactiveTintColor: '#A0A0A0',
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '500',
+        },
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name="chats"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'チャット',
+          tabBarIcon: () => <TabIcon emoji="💬" />,
+        }}
+      />
+      <Tabs.Screen
+        name="plan"
+        options={{
+          title: 'プラン',
+          tabBarIcon: () => <TabIcon emoji="📋" />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: '探す',
+          tabBarIcon: () => <TabIcon emoji="🔍" />,
         }}
       />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          title: '保存',
+          tabBarIcon: () => <TabIcon emoji="🔖" />,
+        }}
+      />
+      <Tabs.Screen
+        name="me"
+        options={{
+          title: 'マイページ',
+          tabBarIcon: () => <TabIcon emoji="👤" />,
+        }}
+      />
+      <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }
