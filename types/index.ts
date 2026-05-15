@@ -339,6 +339,40 @@ export interface CommunityPost {
   liked_by_me?: boolean;
 }
 
+// ─── 掲示板 ──────────────────────────────────────────────
+export type ListingCategory = 'job' | 'roommate' | 'item' | 'travel_companion' | 'other';
+export type ListingStatus = 'active' | 'closed';
+export type ListingPriceFrequency = 'hour' | 'day' | 'week' | 'month' | 'once';
+
+export interface Listing {
+  id: string;
+  user_id: string;
+  category: ListingCategory;
+  title: string;
+  description: string;
+  city: string | null;
+  country: string | null;
+  price_amount: number | null;
+  price_currency: string;
+  price_frequency: ListingPriceFrequency | null;
+  images: string[];
+  expires_at: string | null;
+  status: ListingStatus;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  user?: Pick<User, 'id' | 'nickname' | 'avatar_url' | 'phase'>;
+}
+
+export interface ListingInquiry {
+  id: string;
+  listing_id: string;
+  inquirer_id: string;
+  message: string;
+  status: string;
+  created_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {
