@@ -154,6 +154,36 @@ export interface BookmarkCategory {
   order_index: number;
 }
 
+// ─── 親子連携 / タスク ───────────────────────────────────
+export type ParentLinkStatus = 'pending' | 'active' | 'revoked';
+export type ParentLinkPermission = 'view' | 'comment';
+
+export interface ParentLink {
+  id: string;
+  child_user_id: string;
+  parent_user_id: string | null;
+  permission: ParentLinkPermission;
+  status: ParentLinkStatus;
+  invitation_code: string | null;
+  created_at: string;
+  approved_at: string | null;
+}
+
+export interface Task {
+  id: string;
+  user_id: string;
+  plan_id: string | null;
+  title: string;
+  description: string | null;
+  category: string | null;
+  due_date: string | null;
+  completed_at: string | null;
+  priority: number;
+  is_milestone: boolean;
+  auto_generated: boolean;
+  created_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

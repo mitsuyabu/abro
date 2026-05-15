@@ -1,5 +1,56 @@
 # CHANGELOG
 
+## Phase 1 / Prompt 06 完了 — 2026-05-15
+
+### 実装内容
+
+#### DB マイグレーション
+- `supabase/migrations/0005_parents_and_tasks.sql`
+  - `parent_links` テーブル(親子連携 + 招待コード + RLS)
+  - `tasks` テーブル(タスク管理 + 親も閲覧可能な RLS)
+  - `parent_comments` テーブル(permission='comment' の親のみ書き込み可能)
+
+#### 型 / 定数
+- `types/index.ts` — `ParentLink`, `ParentLinkStatus`, `ParentLinkPermission`, `Task` 追加
+- `lib/task/defaults.ts` — 12件のタスクテンプレート(出発日からのオフセット日数付き)
+
+#### 状態管理 / フック
+- `stores/task.ts` — Zustand タスクストア
+- `hooks/useTasks.ts` — fetchTasks / generateTasksForPlan / toggleComplete / deleteTask / addTask
+- `hooks/useParentLink.ts` — generateInviteCode / acceptInviteCode / revokeLink / fetchMyLinks
+
+#### コンポーネント
+- `components/task/TaskItem.tsx` — チェックボタン + 期限 + マイルストーン ⭐ + 削除
+- `components/parent/InviteParentModal.tsx` — 子側(コード生成+LINE共有) / 親側(コード入力) の2フロー
+
+#### 画面の変更
+- `app/(tabs)/plan.tsx` — フル実装: プラン一覧 + タスク自動生成 + 進捗バー + カウントダウン + 今月/来月/完了済みグループ
+- `app/(tabs)/me.tsx` — 親子連携セクション追加(連携状況表示 + 設定ボタン)
+
+### タスク自動生成の仕様
+- プランが作成されると `fetchTasks` + `generateTasksForPlan` を自動実行
+- 既存タスクがある場合は生成しない(重複防止)
+- `start_date` がある場合: オフセット日数で `due_date` を計算
+- `start_date` がない場合: `due_date = null` で生成(後から追加可能)
+- タスクは「今月やること / 来月以降 / 完了済み」に自動グループ化
+
+### 招待フローの仕様
+- 子側: 6文字英数字コードを生成 → Share.share() で送信
+- 親側: コード入力 → 照合 → 即時 `status: 'active'` (自動承認)
+- 招待コードを再生成すると古いコードは削除される
+
+### 既知の制限・将来対応
+- マイルストーン達成時のプッシュ通知は将来フェーズ
+- 親が子のプランを閲覧する専用画面は将来フェーズ(RLS は設定済み)
+- LINE Messaging API 通知は将来フェーズ
+- タスク期限のリマインダーは将来フェーズ
+
+### 次のプロンプト(07: エージェントルーム)への申し送り
+- `parent_links` の `status: 'active'` を確認することで親子連携状態を判定
+- タスク生成は `generateTasksForPlan(planId, startDate)` を呼ぶだけ
+
+---
+
 ## Phase 1 / Prompt 05 完了 — 2026-05-15
 
 ### 実装内容
