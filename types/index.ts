@@ -434,6 +434,33 @@ export interface AffiliateClick {
   clicked_at: string;
 }
 
+// ─── クリエイター報酬 ─────────────────────────────────────
+export type CreatorEarningSource = 'affiliate' | 'agent_kickback' | 'plan_sale';
+export type CreatorEarningStatus = 'pending' | 'paid' | 'cancelled';
+
+export interface CreatorProfile {
+  user_id: string;
+  display_name: string;
+  bio: string | null;
+  payout_method: Record<string, unknown> | null;
+  total_earned_jpy: number;
+  pending_payout_jpy: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatorEarning {
+  id: string;
+  creator_id: string;
+  source_type: CreatorEarningSource;
+  source_id: string | null;
+  amount_jpy: number;
+  status: CreatorEarningStatus;
+  note: string | null;
+  created_at: string;
+  paid_at: string | null;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

@@ -146,6 +146,15 @@ export default function MeScreen() {
             <Text className="text-sm font-semibold text-primary">🗒️ 予約管理</Text>
             <Text className="text-muted text-sm">›</Text>
           </Pressable>
+          <View className="h-px bg-border my-2" />
+          <Pressable
+            className="flex-row items-center justify-between py-1 active:opacity-70"
+            onPress={() => router.push('/creator' as never)}
+            accessibilityLabel="クリエイター"
+          >
+            <Text className="text-sm font-semibold text-primary">💰 クリエイター</Text>
+            <Text className="text-muted text-sm">›</Text>
+          </Pressable>
         </Card>
 
         {/* サインアウト */}
