@@ -571,6 +571,53 @@ export interface B2BWidgetSession {
   ended_at: string | null;
 }
 
+// ─── エージェント CRM ─────────────────────────────────────
+export type CrmPhase = 'considering' | 'preparing' | 'abroad' | 'returned';
+export type CrmConversionStatus = 'prospect' | 'active' | 'converted' | 'lost';
+export type CrmNoteType = 'call' | 'meeting' | 'email' | 'chat' | 'other';
+
+export interface AgentCrmContact {
+  id: string;
+  agent_id: string;
+  user_id: string | null;
+  counselor_id: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  phase: CrmPhase;
+  conversion_status: CrmConversionStatus;
+  destination_country: string | null;
+  destination_city: string | null;
+  school_name: string | null;
+  plan_id: string | null;
+  deal_amount_jpy: number | null;
+  tags: string[];
+  next_follow_up: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentCrmNote {
+  id: string;
+  contact_id: string;
+  counselor_id: string | null;
+  note_type: CrmNoteType;
+  content: string;
+  follow_up_date: string | null;
+  created_at: string;
+}
+
+export interface AgentAutoReply {
+  agent_id: string;
+  is_enabled: boolean;
+  ai_enabled: boolean;
+  business_hours_start: string;
+  business_hours_end: string;
+  timezone: string;
+  auto_reply_message: string;
+  updated_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

@@ -175,7 +175,7 @@ export default function MeScreen() {
           </Pressable>
         </Card>
 
-        {/* B2B ポータル */}
+        {/* B2B / CRM ポータル */}
         <Card className="gap-0">
           <Pressable
             className="flex-row items-center justify-between py-1 active:opacity-70"
@@ -183,6 +183,15 @@ export default function MeScreen() {
             accessibilityLabel="B2Bポータル"
           >
             <Text className="text-sm font-semibold text-primary">🏫 B2B ポータル</Text>
+            <Text className="text-muted text-sm">›</Text>
+          </Pressable>
+          <View className="h-px bg-border my-2" />
+          <Pressable
+            className="flex-row items-center justify-between py-1 active:opacity-70"
+            onPress={() => router.push('/agent-crm' as never)}
+            accessibilityLabel="エージェントCRM"
+          >
+            <Text className="text-sm font-semibold text-primary">📊 エージェント CRM</Text>
             <Text className="text-muted text-sm">›</Text>
           </Pressable>
         </Card>
