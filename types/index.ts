@@ -495,6 +495,35 @@ export interface FinancialTransaction {
   created_at: string;
 }
 
+// ─── 緊急サポート ─────────────────────────────────────────
+export type EmergencyRelationship = 'parent' | 'friend' | 'agent' | 'doctor' | 'other';
+export type EmergencyCategory = 'medical' | 'theft' | 'trouble' | 'mental' | 'accident' | 'other';
+export type EmergencySeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface EmergencyContact {
+  id: string;
+  user_id: string;
+  label: string;
+  phone: string | null;
+  email: string | null;
+  relationship: EmergencyRelationship;
+  notify_on_sos: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmergencyLog {
+  id: string;
+  user_id: string;
+  category: EmergencyCategory;
+  severity: EmergencySeverity;
+  description: string | null;
+  country: string | null;
+  city: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {
