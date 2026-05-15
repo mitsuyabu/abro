@@ -373,6 +373,38 @@ export interface ListingInquiry {
   created_at: string;
 }
 
+// ─── 先輩Q&A ──────────────────────────────────────────────
+export type QaCategory = 'visa' | 'life' | 'school' | 'work' | 'money' | 'housing' | 'accident' | 'other';
+
+export interface QaThread {
+  id: string;
+  questioner_id: string;
+  category: QaCategory;
+  title: string;
+  content: string;
+  is_anonymous: boolean;
+  answer_count: number;
+  view_count: number;
+  is_resolved: boolean;
+  best_answer_id: string | null;
+  created_at: string;
+  updated_at: string;
+  questioner?: Pick<User, 'id' | 'nickname' | 'avatar_url' | 'phase'>;
+}
+
+export interface QaAnswer {
+  id: string;
+  thread_id: string;
+  answerer_id: string;
+  content: string;
+  vote_count: number;
+  is_best: boolean;
+  created_at: string;
+  updated_at: string;
+  answerer?: Pick<User, 'id' | 'nickname' | 'avatar_url' | 'phase'>;
+  voted_by_me?: boolean;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {

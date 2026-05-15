@@ -20,7 +20,7 @@ const ACTION_CHIPS = [
   { id: 'plan', emoji: '✨', label: 'プランを作る', prompt: 'どんな留学・ワーホリを考えていますか？目的・期間・予算を教えてください。', available: true },
   { id: 'cost', emoji: '💰', label: '費用シミュレート', prompt: '留学・ワーホリの費用をシミュレーションしたいです。まず渡航先と滞在期間を教えてください。', available: true },
   { id: 'save', emoji: '📌', label: '情報を保存', prompt: '', available: true },
-  { id: 'senpai', emoji: '👥', label: '先輩に質問', prompt: '', available: false },
+  { id: 'senpai', emoji: '👥', label: '先輩に質問', prompt: '', available: true },
   { id: 'agent', emoji: '🎓', label: 'エージェント相談', prompt: '', available: true },
 ] as const;
 
@@ -81,6 +81,11 @@ export default function ChatsScreen() {
     if (chip.id === 'agent') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       router.push('/agents' as any);
+      return;
+    }
+    if (chip.id === 'senpai') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      router.push('/qa' as any);
       return;
     }
     handleSend(chip.prompt);
