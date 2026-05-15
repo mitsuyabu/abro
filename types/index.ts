@@ -524,6 +524,53 @@ export interface EmergencyLog {
   created_at: string;
 }
 
+// ─── B2B SaaS ────────────────────────────────────────────
+export type B2BClientType = 'school' | 'agency' | 'other';
+export type B2BPlan = 'free' | 'starter' | 'pro' | 'enterprise';
+
+export interface B2BClient {
+  id: string;
+  owner_user_id: string | null;
+  name: string;
+  type: B2BClientType;
+  country: string | null;
+  city: string | null;
+  website_url: string | null;
+  logo_url: string | null;
+  description: string | null;
+  contact_email: string | null;
+  plan: B2BPlan;
+  is_active: boolean;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface B2BWidget {
+  id: string;
+  client_id: string;
+  name: string;
+  embed_key: string;
+  primary_color: string;
+  welcome_message: string;
+  faq_items: Array<{ question: string; answer: string }>;
+  allowed_domains: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface B2BWidgetSession {
+  id: string;
+  widget_id: string;
+  visitor_id: string | null;
+  referrer_url: string | null;
+  message_count: number;
+  led_to_signup: boolean;
+  started_at: string;
+  ended_at: string | null;
+}
+
 // ─── Supabase DB 型 ──────────────────────────────────────
 export type Database = {
   public: {
