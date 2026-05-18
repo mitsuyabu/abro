@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 const NAV_ITEMS = [
-  { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット', badge: 2, multiply: true },
+  { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット', badge: 2 },
   { href: '/plans',       icon: '/icon-plan.png',        label: 'プラン' },
   { href: '/explore',     icon: '/icon-explore.png',     label: '探す' },
   { href: '/saved',       icon: '/icon-saved.png',       label: '保存済み' },
@@ -39,12 +39,16 @@ export function Sidebar() {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors border-l-2 ${
                 active
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-gray-500 hover:text-primary'
+                  ? 'border-primary text-primary bg-gray-100'
+                  : 'border-transparent text-gray-500 hover:text-primary hover:bg-gray-50'
               }`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.icon} alt={item.label} className="w-8 h-8 object-contain flex-shrink-0" style={item.multiply ? { mixBlendMode: 'multiply' } : undefined} />
+              {/* アイコン背景を白で隔離してmultiplyで白を除去 */}
+              <div className="w-8 h-8 flex-shrink-0 relative" style={{ isolation: 'isolate' }}>
+                <div className="absolute inset-0 bg-white rounded-lg" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.icon} alt={item.label} className="absolute inset-0 w-full h-full object-contain" style={{ mixBlendMode: 'multiply' }} />
+              </div>
               <span className="flex-1">{item.label}</span>
               {item.badge ? (
                 <span className="text-xs bg-primary text-white font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
