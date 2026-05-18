@@ -23,10 +23,10 @@ export function Sidebar() {
       {/* ロゴ */}
       <Link
         href="/chat"
-        className="flex items-center gap-2.5 px-5 py-5 hover:opacity-80 transition-opacity"
+        className="flex items-center px-5 py-4 hover:opacity-80 transition-opacity"
       >
-        <span className="text-primary text-lg leading-none">✦</span>
-        <span className="text-lg font-bold text-primary tracking-tight">Abro.</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="Abro" className="h-9 w-auto object-contain" />
       </Link>
 
       {/* メインナビ */}
@@ -44,7 +44,7 @@ export function Sidebar() {
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.icon} alt={item.label} className="w-8 h-8 object-contain flex-shrink-0" />
+              <img src={item.icon} alt={item.label} className="w-8 h-8 object-contain flex-shrink-0" style={{ mixBlendMode: 'multiply' }} />
               <span className="flex-1">{item.label}</span>
               {item.badge ? (
                 <span className="text-xs bg-primary text-white font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
