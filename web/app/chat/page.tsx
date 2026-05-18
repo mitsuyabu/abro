@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { RecommendationPanel } from '@/components/home/RecommendationPanel';
 
@@ -20,21 +20,49 @@ interface Message {
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSend = async (text: string) => {
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setIsLoading(true);
 
-    // TODO: 実際の AI API 呼び出しに置き換え
-    await new Promise((r) => setTimeout(r, 800));
-    const aiMsg: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: `「${text}」について承りました。詳しく教えていただけますか？`,
-    };
-    setMessages((prev) => [...prev, aiMsg]);
-    setIsLoading(false);
+    const aiId = (Date.now() + 1).toString();
+    setMessages((prev) => [...prev, { id: aiId, role: 'assistant', content: '' }]);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) return;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        setMessages((prev) =>
+          prev.map((m) => m.id === aiId ? { ...m, content: m.content + chunk } : m)
+        );
+      }
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) => m.id === aiId ? { ...m, content: 'エラーが発生しました。もう一度お試しください。' } : m)
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isEmpty = messages.length === 0;
@@ -44,21 +72,26 @@ export default function ChatPage() {
       {/* チャットエリア */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* トップバー */}
-        <div className="h-12 border-b border-border flex items-center px-5 gap-3 bg-white">
+        <div className="h-12 border-b border-border flex items-center px-5 bg-white">
           <span className="text-sm font-semibold text-primary">新しいチャット</span>
-          <span className="text-muted text-xs">▾</span>
+          <span className="text-muted text-xs ml-1">▾</span>
+          <span className="ml-auto text-xs font-medium text-primary/60 italic tracking-wide">留学を、もっと自分らしく</span>
         </div>
 
         {/* メッセージエリア */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-white">
           {isEmpty ? (
             /* ── ホーム状態（チャットなし） ── */
-            <div className="flex flex-col items-center justify-center h-full gap-8 px-8">
+            <div className="flex flex-col items-center justify-center h-full gap-8 px-8 pt-10">
               {/* ヒーロー */}
               <div className="text-center gap-3 flex flex-col">
-                <div className="text-6xl mb-2">✈️</div>
-                <h1 className="text-3xl font-bold text-primary">今日はどこへ？</h1>
-                <p className="text-muted text-sm leading-relaxed">
+                {/* 留学イラスト — web/public/hero.png を配置してください */}
+                <div className="flex justify-center mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/hero.png" alt="留学イラスト" className="w-64 h-auto object-contain" />
+                </div>
+                <h1 className="text-3xl font-bold text-primary">今日は何する？</h1>
+                <p className="text-primary leading-relaxed" style={{ fontSize: '18px' }}>
                   AI があなたの留学・ワーホリをまるごとサポートします。<br />
                   何でも気軽に聞いてみてください。
                 </p>
@@ -70,9 +103,9 @@ export default function ChatPage() {
                   <button
                     key={chip.id}
                     onClick={() => handleSend(chip.prompt)}
-                    className="bg-white border border-border rounded-2xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition-all group"
+                    className="bg-white border border-border rounded-2xl px-4 py-3 text-left hover:border-primary/40 hover:shadow-sm transition-all group flex items-center gap-3"
                   >
-                    <span className="text-xl block mb-1">{chip.emoji}</span>
+                    <span className="text-xl flex-shrink-0">{chip.emoji}</span>
                     <span className="text-sm font-medium text-primary">{chip.label}</span>
                   </button>
                 ))}
@@ -103,7 +136,7 @@ export default function ChatPage() {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.content === '' && (
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                     <span className="text-white text-xs font-bold">Ab</span>
@@ -115,6 +148,7 @@ export default function ChatPage() {
                   </div>
                 </div>
               )}
+              <div ref={bottomRef} />
             </div>
           )}
         </div>
@@ -130,11 +164,13 @@ export default function ChatPage() {
       </div>
 
       {/* 右パネル */}
-      <div className="w-80 xl:w-96 border-l border-border bg-background flex-shrink-0">
-        <div className="h-12 border-b border-border flex items-center px-5 bg-white">
+      <div className="w-96 xl:w-[420px] border-l border-border bg-background flex-shrink-0 flex flex-col h-full overflow-hidden">
+        <div className="h-12 border-b border-border flex items-center px-5 bg-white flex-shrink-0">
           <span className="text-xs font-semibold text-muted uppercase tracking-wide">おすすめ</span>
         </div>
-        <RecommendationPanel />
+        <div className="flex-1 overflow-y-auto">
+          <RecommendationPanel />
+        </div>
       </div>
     </div>
   );

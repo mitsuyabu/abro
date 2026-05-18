@@ -1,10 +1,10 @@
-const COUNTRIES = [
-  { flag: '🇦🇺', name: 'オーストラリア', city: 'シドニー', type: '語学留学・ワーホリ' },
-  { flag: '🇨🇦', name: 'カナダ',         city: 'バンクーバー', type: '語学留学・ワーホリ' },
-  { flag: '🇬🇧', name: 'イギリス',       city: 'ロンドン', type: '語学留学・大学進学' },
-  { flag: '🇳🇿', name: 'ニュージーランド', city: 'オークランド', type: 'ワーホリ' },
-  { flag: '🇮🇪', name: 'アイルランド',   city: 'ダブリン', type: 'ワーホリ・語学留学' },
-  { flag: '🇺🇸', name: 'アメリカ',       city: 'ニューヨーク', type: '大学・語学留学' },
+const DESTINATIONS = [
+  { flag: '🇦🇺', city: 'シドニー',     country: 'オーストラリア', type: 'ワーホリ',  image: '/シドニー.png' },
+  { flag: '🇨🇦', city: 'トロント',     country: 'カナダ',         type: 'ワーホリ',  image: '/トロント.png' },
+  { flag: '🇬🇧', city: 'ロンドン',     country: 'イギリス',       type: '語学留学',  image: '/ロンドン.png' },
+  { flag: '🇳🇿', city: 'オークランド', country: 'NZ',             type: 'ワーホリ',  image: '/オークランド.png' },
+  { flag: '🇵🇭', city: 'セブ島',       country: 'フィリピン',     type: '語学留学',  image: '/セブ.png' },
+  { flag: '🇲🇹', city: 'マルタ',       country: 'マルタ共和国',   type: '語学留学',  image: '/マルタ.png' },
 ];
 
 const QUICK_TIPS = [
@@ -15,48 +15,29 @@ const QUICK_TIPS = [
 
 export function RecommendationPanel() {
   return (
-    <div className="h-full overflow-y-auto px-5 py-6 flex flex-col gap-6">
-      {/* おすすめ渡航先 */}
+    <div className="px-4 py-5 flex flex-col gap-6">
+      {/* 人気の渡航先 */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-primary">人気の渡航先</h2>
           <button className="text-xs text-muted hover:text-primary transition-colors">すべて見る</button>
         </div>
-        <div className="grid grid-cols-1 gap-2">
-          {COUNTRIES.slice(0, 4).map((c) => (
+        <div className="grid grid-cols-2 gap-2">
+          {DESTINATIONS.map((d) => (
             <button
-              key={c.name}
-              className="flex items-center gap-3 bg-white border border-border rounded-xl px-4 py-3 text-left hover:border-primary/30 hover:shadow-sm transition-all group"
+              key={d.city}
+              className="relative rounded-2xl overflow-hidden text-left group hover:shadow-md transition-all hover:scale-[1.02]"
+              style={{ aspectRatio: '247 / 164' }}
             >
-              <span className="text-2xl">{c.flag}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-primary">{c.name}</p>
-                <p className="text-xs text-muted truncate">{c.city} · {c.type}</p>
-              </div>
-              <span className="text-muted text-sm opacity-0 group-hover:opacity-100 transition-opacity">›</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* 始め方 */}
-      <section>
-        <h2 className="text-sm font-semibold text-primary mb-3">まず何をする？</h2>
-        <div className="flex flex-col gap-2">
-          {[
-            { icon: '✨', label: 'プランを作る',      desc: 'AI が目的・予算から留学プランを提案' },
-            { icon: '💰', label: '費用シミュレート',   desc: '渡航先・期間を入れると費用を自動計算' },
-            { icon: '👥', label: '先輩に聞く',        desc: '経験者の失敗談・アドバイスをチェック' },
-            { icon: '🎓', label: 'エージェント相談',  desc: '認定エージェントと無料オンライン相談' },
-          ].map((item) => (
-            <button
-              key={item.label}
-              className="flex items-start gap-3 bg-white border border-border rounded-xl px-4 py-3 text-left hover:border-primary/30 hover:shadow-sm transition-all"
-            >
-              <span className="text-xl mt-0.5">{item.icon}</span>
-              <div>
-                <p className="text-sm font-medium text-primary">{item.label}</p>
-                <p className="text-xs text-muted leading-relaxed">{item.desc}</p>
+              {/* 写真 */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={d.image} alt={d.city} className="absolute inset-0 w-full h-full object-cover" />
+              {/* 国旗 */}
+              <span className="absolute top-2 left-2.5 text-xl drop-shadow">{d.flag}</span>
+              {/* 下部テキストオーバーレイ */}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2.5">
+                <p className="text-white text-xs font-bold leading-tight">{d.city}</p>
+                <p className="text-white/80 text-[10px]">{d.type}</p>
               </div>
             </button>
           ))}
