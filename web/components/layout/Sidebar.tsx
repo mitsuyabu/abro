@@ -43,12 +43,8 @@ export function Sidebar() {
                   : 'border-transparent text-gray-500 hover:text-primary hover:bg-gray-50'
               }`}
             >
-              {/* アイコン背景を白で隔離してmultiplyで白を除去 */}
-              <div className="w-8 h-8 flex-shrink-0 relative" style={{ isolation: 'isolate' }}>
-                <div className="absolute inset-0 bg-white rounded-lg" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.icon} alt={item.label} className="absolute inset-0 w-full h-full object-contain" style={{ mixBlendMode: 'multiply' }} />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.icon} alt={item.label} className="w-8 h-8 object-contain flex-shrink-0" />
               <span className="flex-1">{item.label}</span>
               {item.badge ? (
                 <span className="text-xs bg-primary text-white font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
