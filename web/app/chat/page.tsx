@@ -171,7 +171,7 @@ export default function ChatPage() {
 
               <div className="w-full max-w-lg px-0">
                 <ChatInput onSend={handleSend} disabled={isLoading} />
-                <p className="text-xs text-muted text-center mt-2 hidden sm:block">Enter で送信 · Shift+Enter で改行</p>
+                <p className="text-xs text-muted text-center mt-2 hidden sm:block">Shift+Enter で送信 · Enter で改行</p>
               </div>
             </div>
           ) : (
