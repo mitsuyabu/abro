@@ -13,7 +13,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-background h-screen overflow-hidden">
         <div className="flex h-full">
           <Sidebar />
-          <main className="ml-52 flex-1 h-full overflow-hidden">
+          {/* モバイル: ml-0 pb-16（下部ナビ分）/ タブレット: ml-16 / デスクトップ: ml-52 */}
+          <main className="flex-1 h-full overflow-hidden pb-16 md:pb-0 md:ml-16 lg:ml-52">
             {children}
           </main>
         </div>
