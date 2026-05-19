@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 
+export const dynamic = "force-dynamic";
+
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデープランナーです。
