@@ -1,6 +1,6 @@
 'use client';
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
@@ -14,15 +14,8 @@ function LoginContent() {
     setLoading(true);
     setAuthError(null);
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !supabaseKey) {
-        setAuthError('環境変数が設定されていません。VercelのSettings → Environment Variablesを確認してください。');
-        setLoading(false);
-        return;
-      }
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -30,13 +23,6 @@ function LoginContent() {
       });
       if (error) {
         setAuthError(error.message);
-        setLoading(false);
-        return;
-      }
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
-        setAuthError('ログインURLの取得に失敗しました。');
         setLoading(false);
       }
     } catch (e) {
