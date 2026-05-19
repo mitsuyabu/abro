@@ -1,8 +1,26 @@
 import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function fetchSchoolsPrompt(): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase.from("schools").select("name, city, country, type, fee_per_week, description, website, is_partner");
+    if (!data || data.length === 0) return "";
+    const lines = data.map((s: { name: string; city: string; type: string; fee_per_week: number | null; description: string | null; website: string | null; is_partner: boolean }) =>
+      `- ${s.name}（${s.city}）: ${s.type}、週約¥${s.fee_per_week?.toLocaleString() ?? "要問合せ"}、${s.is_partner ? "提携校" : "非提携校"}。${s.description ?? ""}`
+    ).join("\n");
+    return `\n\n# アプリ掲載の語学学校データ\n以下はAbroに登録されている語学学校です。学校を提案する際はこのデータを優先して使用してください。\n${lines}`;
+  } catch {
+    return "";
+  }
+}
 
 const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデープランナーです。
 役割は、単なるFAQ回答者ではありません。
@@ -594,12 +612,13 @@ const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデー
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
+    const schoolsPrompt = await fetchSchoolsPrompt();
 
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2048,
       stream: true,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt }, ...messages],
     });
 
     const encoder = new TextEncoder();

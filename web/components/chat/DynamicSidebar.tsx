@@ -18,9 +18,23 @@ export interface CityItem {
   mapQuery: string;
 }
 
+export interface SchoolItem {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+  type: string;
+  fee_per_week: number | null;
+  description: string | null;
+  website: string | null;
+  is_partner: boolean;
+  images: string[];
+}
+
 export interface SidebarContext {
   countries: CountryItem[];
   cities: CityItem[];
+  schools: SchoolItem[];
   showAgents: boolean;
 }
 
@@ -282,8 +296,8 @@ function ImageGallery({
 
 export function DynamicSidebar({ context }: Props) {
   const [focusedCity, setFocusedCity] = useState<CityItem | null>(null);
-  const { countries, cities, showAgents } = context;
-  const hasContext = countries.length > 0 || cities.length > 0 || showAgents;
+  const { countries, cities, schools, showAgents } = context;
+  const hasContext = countries.length > 0 || cities.length > 0 || schools.length > 0 || showAgents;
 
   if (!hasContext) return <RecommendationPanel />;
 
@@ -383,6 +397,46 @@ export function DynamicSidebar({ context }: Props) {
                   </div>
                 )}
               </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {schools.length > 0 && (
+        <div className="px-4 pt-4 pb-2">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
+            語学学校
+          </p>
+          <div className="flex flex-col gap-2">
+            {schools.map((school) => (
+              <a
+                key={school.id}
+                href={school.website ?? '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all block"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold text-primary truncate">{school.name}</span>
+                      {school.is_partner && (
+                        <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">提携校</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted mt-0.5">{school.city} · {school.type}</div>
+                  </div>
+                  {school.fee_per_week && (
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs font-semibold text-primary">¥{school.fee_per_week.toLocaleString()}</div>
+                      <div className="text-[10px] text-muted">/週</div>
+                    </div>
+                  )}
+                </div>
+                {school.description && (
+                  <p className="text-xs text-muted mt-1.5 leading-relaxed line-clamp-2">{school.description}</p>
+                )}
+              </a>
             ))}
           </div>
         </div>

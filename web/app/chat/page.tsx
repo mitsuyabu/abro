@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE } from '@/components/chat/DynamicSidebar';
+import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem } from '@/components/chat/DynamicSidebar';
 
 const ACTION_CHIPS = [
   { id: 'plan',  emoji: '✨', label: 'プランを作る',    prompt: 'ワーホリ・留学のプランを一緒に考えたいです。' },
@@ -25,14 +25,15 @@ interface Message {
   content: string;
 }
 
-function detectSidebarContext(content: string): SidebarContext {
+function detectSidebarContext(content: string, allSchools: SchoolItem[]): SidebarContext {
   const cities = CITY_DATA.filter(c => content.includes(c.name));
   const cityCountryNames = new Set(cities.map(c => c.country));
   const countries = COUNTRY_DATA.filter(c => content.includes(c.name) && !cityCountryNames.has(c.name));
   const showAgents =
     content.includes('エージェント') &&
     (content.includes('相談') || content.includes('おすすめ') || content.includes('提案') || content.includes('紹介'));
-  return { cities, countries, showAgents };
+  const schools = allSchools.filter(s => content.includes(s.name));
+  return { cities, countries, schools, showAgents };
 }
 
 function parseChoices(content: string): string[] {
@@ -59,9 +60,16 @@ const avatarStyle: React.CSSProperties = AVATAR_STYLE; // unused but kept for ty
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], showAgents: false });
+  const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch('/api/schools').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setAllSchools(data);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -96,7 +104,7 @@ export default function ChatPage() {
         setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: m.content + chunk } : m));
       }
 
-      setSidebarContext(detectSidebarContext(fullContent));
+      setSidebarContext(detectSidebarContext(fullContent, allSchools));
     } catch {
       setMessages(prev =>
         prev.map(m => m.id === aiId ? { ...m, content: 'エラーが発生しました。もう一度お試しください。' } : m)
@@ -112,12 +120,14 @@ export default function ChatPage() {
 
   const sidebarLabel =
     sidebarContext.showAgents ? 'エージェント' :
+    sidebarContext.schools.length > 0 ? '語学学校' :
     sidebarContext.cities.length > 0 ? '候補の都市' :
     sidebarContext.countries.length > 0 ? '候補の国' : 'おすすめ';
 
   const hasRightContent =
     sidebarContext.cities.length > 0 ||
     sidebarContext.countries.length > 0 ||
+    sidebarContext.schools.length > 0 ||
     sidebarContext.showAgents;
 
   return (
