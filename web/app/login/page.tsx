@@ -14,14 +14,22 @@ function LoginContent() {
     setLoading(true);
     setAuthError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        skipBrowserRedirect: true,
       },
     });
     if (error) {
       setAuthError(error.message);
+      setLoading(false);
+      return;
+    }
+    if (data?.url) {
+      window.location.href = data.url;
+    } else {
+      setAuthError('ログインURLの取得に失敗しました。Supabaseの設定を確認してください。');
       setLoading(false);
     }
   };
