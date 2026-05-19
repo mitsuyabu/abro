@@ -4,11 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 function LoginContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
@@ -19,6 +14,10 @@ function LoginContent() {
     setLoading(true);
     setAuthError(null);
     try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
