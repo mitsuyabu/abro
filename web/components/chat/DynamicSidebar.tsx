@@ -2,6 +2,9 @@
 
 import { RecommendationPanel } from "@/components/home/RecommendationPanel";
 import { useState } from "react";
+import dynamic from "next/dynamic";
+
+const SchoolMap = dynamic(() => import("./SchoolMap"), { ssr: false });
 
 export interface CountryItem {
   name: string;
@@ -296,10 +299,57 @@ function ImageGallery({
 
 export function DynamicSidebar({ context }: Props) {
   const [focusedCity, setFocusedCity] = useState<CityItem | null>(null);
+  const [focusedSchool, setFocusedSchool] = useState<SchoolItem | null>(null);
   const { countries, cities, schools, showAgents } = context;
   const hasContext = countries.length > 0 || cities.length > 0 || schools.length > 0 || showAgents;
 
   if (!hasContext) return <RecommendationPanel />;
+
+  if (focusedSchool) {
+    return (
+      <div className="flex flex-col h-full overflow-y-auto">
+        <button
+          onClick={() => setFocusedSchool(null)}
+          className="flex items-center gap-1 px-4 py-3 text-sm text-muted hover:text-primary transition-colors flex-shrink-0"
+        >
+          ← 戻る
+        </button>
+        <div className="p-4 flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-primary">{focusedSchool.name}</h2>
+              <p className="text-sm text-muted mt-0.5">{focusedSchool.city} · {focusedSchool.type}</p>
+            </div>
+            {focusedSchool.is_partner && (
+              <span className="text-[10px] bg-primary text-white px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0">提携校</span>
+            )}
+          </div>
+
+          {focusedSchool.fee_per_week && (
+            <div className="bg-background rounded-xl p-3">
+              <p className="text-xs text-muted">週あたり学費の目安</p>
+              <p className="text-xl font-bold text-primary mt-0.5">¥{focusedSchool.fee_per_week.toLocaleString()}<span className="text-sm font-normal text-muted"> /週</span></p>
+            </div>
+          )}
+
+          {focusedSchool.description && (
+            <p className="text-sm text-primary leading-relaxed">{focusedSchool.description}</p>
+          )}
+
+          {focusedSchool.website && (
+            <a
+              href={focusedSchool.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-primary text-white text-center py-3 rounded-2xl text-sm font-medium hover:opacity-80 transition-opacity block"
+            >
+              公式サイトを見る →
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (focusedCity) {
     return (
@@ -403,18 +453,19 @@ export function DynamicSidebar({ context }: Props) {
       )}
 
       {schools.length > 0 && (
-        <div className="px-4 pt-4 pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
+        <div className="pb-2">
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide px-4 pt-4 mb-3">
             語学学校
           </p>
-          <div className="flex flex-col gap-2">
+          {/* マップ */}
+          <SchoolMap schools={schools} onSelect={setFocusedSchool} />
+          {/* 学校カードリスト */}
+          <div className="flex flex-col gap-2 px-4 pt-3">
             {schools.map((school) => (
-              <a
+              <button
                 key={school.id}
-                href={school.website ?? '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all block"
+                onClick={() => setFocusedSchool(school)}
+                className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all text-left w-full"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -436,7 +487,7 @@ export function DynamicSidebar({ context }: Props) {
                 {school.description && (
                   <p className="text-xs text-muted mt-1.5 leading-relaxed line-clamp-2">{school.description}</p>
                 )}
-              </a>
+              </button>
             ))}
           </div>
         </div>

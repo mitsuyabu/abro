@@ -14,10 +14,13 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
     "@tailwindcss/typography": "^0.5.19",
+    "@types/leaflet": "^1.9.21",
+    "leaflet": "^1.9.4",
     "next": "^16.2.6",
     "openai": "^6.38.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {

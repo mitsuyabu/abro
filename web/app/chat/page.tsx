@@ -32,7 +32,8 @@ function detectSidebarContext(content: string, allSchools: SchoolItem[]): Sideba
   const showAgents =
     content.includes('エージェント') &&
     (content.includes('相談') || content.includes('おすすめ') || content.includes('提案') || content.includes('紹介'));
-  const schools = allSchools.filter(s => content.includes(s.name));
+  const lowerContent = content.toLowerCase();
+  const schools = allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
   return { cities, countries, schools, showAgents };
 }
 
