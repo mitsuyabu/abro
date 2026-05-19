@@ -8,10 +8,10 @@ export function middleware(request: NextRequest) {
 
   if (isPublicPath) return NextResponse.next();
 
-  // Supabaseのセッションクッキーが存在するか確認
+  // Supabaseのセッションクッキーが存在するか確認（チャンク形式 .0 .1 にも対応）
   const hasSession = request.cookies.getAll().some(
     (cookie) =>
-      cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token')
+      cookie.name.startsWith('sb-') && cookie.name.includes('-auth-token')
   );
 
   if (!hasSession) {
