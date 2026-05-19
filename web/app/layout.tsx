@@ -3,8 +3,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Abro — 留学・ワーホリ AI プラットフォーム',
-  description: 'AI があなたの留学・ワーホリをまるごとサポート',
+  title: 'Abro',
+  description: 'AI-powered study abroad & working holiday platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
