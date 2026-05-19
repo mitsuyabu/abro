@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 const NAV_ITEMS = [
   { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット', badge: 2 },
@@ -19,6 +22,22 @@ const BOTTOM_NAV_ITEMS = NAV_ITEMS.slice(0, 5);
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <>
@@ -89,25 +108,34 @@ export function Sidebar() {
 
         {/* フッター：ユーザー */}
         <div className="border-t border-border px-2 lg:px-3 py-3">
-          <Link
-            href="/profile"
-            title="マイページ"
-            className={`flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl transition-colors hover:bg-gray-50 group ${
-              pathname.startsWith('/profile') ? 'bg-gray-100' : ''
-            }`}
+          {/* ユーザーアバター＋名前 */}
+          <div className="flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl">
+            {user?.user_metadata?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.user_metadata.avatar_url}
+                alt="avatar"
+                className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm leading-none">👤</span>
+              </div>
+            )}
+            <span className="hidden lg:block text-sm font-medium text-primary flex-1 truncate">
+              {user?.user_metadata?.name ?? user?.email ?? 'ゲスト'}
+            </span>
+          </div>
+
+          {/* ログアウトボタン */}
+          <button
+            onClick={handleLogout}
+            title="ログアウト"
+            className="w-full flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2 rounded-xl text-sm text-muted hover:text-red-500 hover:bg-red-50 transition-colors mt-1"
           >
-            <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
-              <span className="text-sm leading-none">👤</span>
-            </div>
-            <span className="hidden lg:block text-sm font-medium text-primary flex-1 truncate">マイページ</span>
-            <button
-              onClick={(e) => e.preventDefault()}
-              className="hidden lg:block opacity-0 group-hover:opacity-100 text-muted hover:text-primary transition-all text-lg leading-none px-1"
-              aria-label="メニュー"
-            >
-              ···
-            </button>
-          </Link>
+            <span className="text-base leading-none">↩</span>
+            <span className="hidden lg:block">ログアウト</span>
+          </button>
 
           {/* コピーライト（デスクトップのみ） */}
           <div className="hidden lg:block mt-2 px-3">
