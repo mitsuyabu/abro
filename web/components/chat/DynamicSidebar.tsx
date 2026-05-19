@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { RecommendationPanel } from '@/components/home/RecommendationPanel';
+import { RecommendationPanel } from "@/components/home/RecommendationPanel";
+import { useState } from "react";
 
 export interface CountryItem {
   name: string;
   flag: string;
-  image: string;
+  images: string[];
   mapQuery: string;
 }
 
@@ -14,7 +14,7 @@ export interface CityItem {
   name: string;
   country: string;
   flag: string;
-  image: string;
+  images: string[];
   mapQuery: string;
 }
 
@@ -25,49 +25,265 @@ export interface SidebarContext {
 }
 
 export const COUNTRY_DATA: CountryItem[] = [
-  { name: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Australia' },
-  { name: 'カナダ', flag: '🇨🇦', image: '/トロント.png', mapQuery: 'Canada' },
-  { name: 'イギリス', flag: '🇬🇧', image: '/ロンドン.png', mapQuery: 'United Kingdom' },
-  { name: 'ニュージーランド', flag: '🇳🇿', image: '/オークランド.png', mapQuery: 'New Zealand' },
-  { name: 'フィリピン', flag: '🇵🇭', image: '/セブ.png', mapQuery: 'Philippines' },
-  { name: 'マルタ', flag: '🇲🇹', image: '/マルタ.png', mapQuery: 'Malta' },
-  { name: 'アメリカ', flag: '🇺🇸', image: '/シドニー.png', mapQuery: 'United States' },
-  { name: 'アイルランド', flag: '🇮🇪', image: '/ロンドン.png', mapQuery: 'Ireland' },
+  {
+    name: "オーストラリア",
+    flag: "🇦🇺",
+    images: ["/シドニー.png"],
+    mapQuery: "Australia",
+  },
+  { name: "カナダ", flag: "🇨🇦", images: ["/トロント.png"], mapQuery: "Canada" },
+  {
+    name: "イギリス",
+    flag: "🇬🇧",
+    images: ["/ロンドン.png"],
+    mapQuery: "United Kingdom",
+  },
+  {
+    name: "ニュージーランド",
+    flag: "🇳🇿",
+    images: ["/オークランド.png"],
+    mapQuery: "New Zealand",
+  },
+  {
+    name: "フィリピン",
+    flag: "🇵🇭",
+    images: ["/セブ.png"],
+    mapQuery: "Philippines",
+  },
+  { name: "マルタ", flag: "🇲🇹", images: ["/マルタ.png"], mapQuery: "Malta" },
+  {
+    name: "アメリカ",
+    flag: "🇺🇸",
+    images: ["/シドニー.png"],
+    mapQuery: "United States",
+  },
+  {
+    name: "アイルランド",
+    flag: "🇮🇪",
+    images: ["/ロンドン.png"],
+    mapQuery: "Ireland",
+  },
 ];
 
 export const CITY_DATA: CityItem[] = [
-  { name: 'シドニー', country: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Sydney, Australia' },
-  { name: 'メルボルン', country: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Melbourne, Australia' },
-  { name: 'ブリスベン', country: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Brisbane, Australia' },
-  { name: 'パース', country: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Perth, Australia' },
-  { name: 'ゴールドコースト', country: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Gold Coast, Australia' },
-  { name: 'ケアンズ', country: 'オーストラリア', flag: '🇦🇺', image: '/シドニー.png', mapQuery: 'Cairns, Australia' },
-  { name: 'トロント', country: 'カナダ', flag: '🇨🇦', image: '/トロント.png', mapQuery: 'Toronto, Canada' },
-  { name: 'バンクーバー', country: 'カナダ', flag: '🇨🇦', image: '/トロント.png', mapQuery: 'Vancouver, Canada' },
-  { name: 'ロンドン', country: 'イギリス', flag: '🇬🇧', image: '/ロンドン.png', mapQuery: 'London, UK' },
-  { name: 'エジンバラ', country: 'イギリス', flag: '🇬🇧', image: '/ロンドン.png', mapQuery: 'Edinburgh, UK' },
-  { name: 'オークランド', country: 'ニュージーランド', flag: '🇳🇿', image: '/オークランド.png', mapQuery: 'Auckland, New Zealand' },
-  { name: 'セブ', country: 'フィリピン', flag: '🇵🇭', image: '/セブ.png', mapQuery: 'Cebu, Philippines' },
-  { name: 'マニラ', country: 'フィリピン', flag: '🇵🇭', image: '/セブ.png', mapQuery: 'Manila, Philippines' },
-  { name: 'マルタ', country: 'マルタ', flag: '🇲🇹', image: '/マルタ.png', mapQuery: 'Valletta, Malta' },
+  {
+    name: "シドニー",
+    country: "オーストラリア",
+    flag: "🇦🇺",
+    images: [
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1530276371031-2511efff9d5a.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTMwMjc2MzcxMDMxLTI1MTFlZmZmOWQ1YS5hdmlmIiwiaWF0IjoxNzc5MTc4MjM4LCJleHAiOjE4MTA3MTQyMzh9.7YZmpSpH8gMXHh3huHJabFDu4gshODOwZnCBvNEYn2U",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1598948485421-33a1655d3c18.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTk4OTQ4NDg1NDIxLTMzYTE2NTVkM2MxOC5hdmlmIiwiaWF0IjoxNzc5MTc4NDcxLCJleHAiOjE4MTA3MTQ0NzF9.GBddv1v8S2u_AxdDKHfUuqF7HqXNJgQfXoCa60THTLY",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1634201429366-a3f4dbf05544.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNjM0MjAxNDI5MzY2LWEzZjRkYmYwNTU0NC5hdmlmIiwiaWF0IjoxNzc5MTc4NTMwLCJleHAiOjE4MTA3MTQ1MzB9.FzENBoYeRMC4o2zRMLoyzahJ9KIrRZ0lM9ym2fASn-g",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/premium_photo-1697730262092-03c94e7dd8fa.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9wcmVtaXVtX3Bob3RvLTE2OTc3MzAyNjIwOTItMDNjOTRlN2RkOGZhLmF2aWYiLCJpYXQiOjE3NzkxNzg2MTUsImV4cCI6MTgxMDcxNDYxNX0.Ahy92hUAoA7lJ1i_ciGOc_O6EF6oS0E60mmGImU9MRA",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1695142887255-2ce7c1b33dda.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNjk1MTQyODg3MjU1LTJjZTdjMWIzM2RkYS5hdmlmIiwiaWF0IjoxNzc5MTc4NTg4LCJleHAiOjE4MTA3MTQ1ODh9.DmGxKGvoNP-cPdJsHSPpyovJzp52Kn46Wb-sNh0HSKg",
+    ],
+    mapQuery: "Sydney, Australia",
+  },
+  {
+    name: "メルボルン",
+    country: "オーストラリア",
+    flag: "🇦🇺",
+    images: [
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1514395462725-fb4566210144.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTE0Mzk1NDYyNzI1LWZiNDU2NjIxMDE0NC5hdmlmIiwiaWF0IjoxNzc5MTc3NjY1LCJleHAiOjE4MTA3MTM2NjV9.7yvlYrUzHDAAD_AQACsL6DpgLVJvvZTdUgZzNBvibLA",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1545044846-351ba102b6d5.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTQ1MDQ0ODQ2LTM1MWJhMTAyYjZkNS5hdmlmIiwiaWF0IjoxNzc5MTc4Mjc1LCJleHAiOjE4MTA3MTQyNzV9.uAnMYHtaZrGLWSKI-7PXFMVWltcBdIpAyfBbM47Ywi4",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1494236472818-d35e50e604cf.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNDk0MjM2NDcyODE4LWQzNWU1MGU2MDRjZi5hdmlmIiwiaWF0IjoxNzc5MTc3NjQ2LCJleHAiOjE4MTA3MTM2NDZ9.hBcFZM1lMir6vkRhWGmEKld96qKb_fDSGoK-xLjAF1s",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1594300070414-34b8021779bf.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTk0MzAwMDcwNDE0LTM0YjgwMjE3NzliZi5hdmlmIiwiaWF0IjoxNzc5MTc4NDUxLCJleHAiOjE4MTA3MTQ0NTF9.VYXhmZER0D5oRtjSnq1C5rt1efKyPFtvzryt-vsSR5g",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1562162315-823bc0b8a3dd.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTYyMTYyMzE1LTgyM2JjMGI4YTNkZC5hdmlmIiwiaWF0IjoxNzc5MTc4MzIzLCJleHAiOjE4MTA3MTQzMjN9.iSjSWBRV79kb-MlSSwFHX8JyW3mBW8rQqHO4vyH5jV4",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1587968916653-f52a46826407.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTg3OTY4OTE2NjUzLWY1MmE0NjgyNjQwNy5hdmlmIiwiaWF0IjoxNzc5MTc4Mzg4LCJleHAiOjE4MTA3MTQzODh9.X5IxjLdUXL3eBPJPfBdUQgzoxDP08FrbB_lk9oHeTqQ",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1686052183140-088f1bd9a49b.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNjg2MDUyMTgzMTQwLTA4OGYxYmQ5YTQ5Yi5hdmlmIiwiaWF0IjoxNzc5MTc4NTUxLCJleHAiOjE4MTA3MTQ1NTF9.C4UFJnbr0MTpHBmijyFmYUyMZGkQPj0zY8hbu7OGYVs",
+    ],
+    mapQuery: "Melbourne, Australia",
+  },
+  {
+    name: "ブリスベン",
+    country: "オーストラリア",
+    flag: "🇦🇺",
+    images: [
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1589976567749-2f011d95ffec.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTg5OTc2NTY3NzQ5LTJmMDExZDk1ZmZlYy5hdmlmIiwiaWF0IjoxNzc5MTc4NDA3LCJleHAiOjE4MTA3MTQ0MDd9.Sf2jZikB9GAEzeWI6Yx0iaGH7KSRWeiSuEejGIyPA1s",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1452859030887-bb96ef08d051.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNDUyODU5MDMwODg3LWJiOTZlZjA4ZDA1MS5hdmlmIiwiaWF0IjoxNzc5MTc3NjA5LCJleHAiOjE4MTA3MTM2MDl9.dc0kY-C6z_i6N33SM5CQNQMrk1xgwiK2G_Sj2XRWEr0",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1623027535342-d6df91eb216c.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNjIzMDI3NTM1MzQyLWQ2ZGY5MWViMjE2Yy5hdmlmIiwiaWF0IjoxNzc5MTc4NTA5LCJleHAiOjE4MTA3MTQ1MDl9.ignln9jQvT2p4B5_OMyDWlR3S_PMEUmkDbF-tR1LcYc",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1566734904496-9309bb1798ae.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTY2NzM0OTA0NDk2LTkzMDliYjE3OThhZS5hdmlmIiwiaWF0IjoxNzc5MTc4MzYzLCJleHAiOjE4MTA3MTQzNjN9.aASZvRgaZIJI4Gm7kHMx92iVhMRdXe5OtT2SqAbl0gc",
+    ],
+    mapQuery: "Brisbane, Australia",
+  },
+  {
+    name: "パース",
+    country: "オーストラリア",
+    flag: "🇦🇺",
+    images: ["/シドニー.png"],
+    mapQuery: "Perth, Australia",
+  },
+  {
+    name: "ゴールドコースト",
+    country: "オーストラリア",
+    flag: "🇦🇺",
+    images: [
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1591701729564-3b5325d5a4bd.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTkxNzAxNzI5NTY0LTNiNTMyNWQ1YTRiZC5hdmlmIiwiaWF0IjoxNzc5MTc4NDI2LCJleHAiOjE4MTA3MTQ0MjZ9.dmCHZgfLr6uBg7RayDNFjybtBDTRiwXRfH6vrV0x7Is",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1599097653069-bf45de660b69.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTk5MDk3NjUzMDY5LWJmNDVkZTY2MGI2OS5hdmlmIiwiaWF0IjoxNzc5MTc4NDkwLCJleHAiOjE4MTA3MTQ0OTB9._fv6vUlcVBrmx9iAU7FJmP50tQai0lT3aKcYOCsMZPw",
+      "https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1688350257158-8777cf0ba6d3.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNjg4MzUwMjU3MTU4LTg3NzdjZjBiYTZkMy5hdmlmIiwiaWF0IjoxNzc5MTc4NTY5LCJleHAiOjE4MTA3MTQ1Njl9.mSujW8LbMKrYlyHbQb-JMPIH0ZDDN4oYGyKugS7Fdos",
+    ],
+    mapQuery: "Gold Coast, Australia",
+  },
+  {
+    name: "ケアンズ",
+    country: "オーストラリア",
+    flag: "🇦🇺",
+    images: ["/シドニー.png"],
+    mapQuery: "Cairns, Australia",
+  },
+  {
+    name: "トロント",
+    country: "カナダ",
+    flag: "🇨🇦",
+    images: ["/トロント.png"],
+    mapQuery: "Toronto, Canada",
+  },
+  {
+    name: "バンクーバー",
+    country: "カナダ",
+    flag: "🇨🇦",
+    images: ["/トロント.png"],
+    mapQuery: "Vancouver, Canada",
+  },
+  {
+    name: "ロンドン",
+    country: "イギリス",
+    flag: "🇬🇧",
+    images: ["/ロンドン.png"],
+    mapQuery: "London, UK",
+  },
+  {
+    name: "エジンバラ",
+    country: "イギリス",
+    flag: "🇬🇧",
+    images: ["/ロンドン.png"],
+    mapQuery: "Edinburgh, UK",
+  },
+  {
+    name: "オークランド",
+    country: "ニュージーランド",
+    flag: "🇳🇿",
+    images: ["/オークランド.png"],
+    mapQuery: "Auckland, New Zealand",
+  },
+  {
+    name: "セブ",
+    country: "フィリピン",
+    flag: "🇵🇭",
+    images: ["/セブ.png"],
+    mapQuery: "Cebu, Philippines",
+  },
+  {
+    name: "マニラ",
+    country: "フィリピン",
+    flag: "🇵🇭",
+    images: ["/セブ.png"],
+    mapQuery: "Manila, Philippines",
+  },
+  {
+    name: "マルタ",
+    country: "マルタ",
+    flag: "🇲🇹",
+    images: ["/マルタ.png"],
+    mapQuery: "Valletta, Malta",
+  },
 ];
 
 const AGENTS = [
-  { id: 1, name: 'スタディ留学センター', specialty: '語学留学・大学進学サポート', rating: 4.8, reviews: 1240, badge: '実績No.1' },
-  { id: 2, name: 'ワーホリプロ', specialty: 'ワーキングホリデー専門', rating: 4.7, reviews: 892, badge: '専門特化' },
-  { id: 3, name: 'グローバルEdge', specialty: 'コスパ重視・初心者向け', rating: 4.6, reviews: 567, badge: '初心者向け' },
+  {
+    id: 1,
+    name: "スタディ留学センター",
+    specialty: "語学留学・大学進学サポート",
+    rating: 4.8,
+    reviews: 1240,
+    badge: "実績No.1",
+  },
+  {
+    id: 2,
+    name: "ワーホリプロ",
+    specialty: "ワーキングホリデー専門",
+    rating: 4.7,
+    reviews: 892,
+    badge: "専門特化",
+  },
+  {
+    id: 3,
+    name: "グローバルEdge",
+    specialty: "コスパ重視・初心者向け",
+    rating: 4.6,
+    reviews: 567,
+    badge: "初心者向け",
+  },
 ];
 
 const AVATAR_STYLE: React.CSSProperties = {
-  backgroundImage: 'url(/logo.png)',
-  backgroundSize: '96px auto',
-  backgroundPosition: 'left center',
-  backgroundRepeat: 'no-repeat',
-  filter: 'invert(1)',
+  backgroundImage: "url(/logo.png)",
+  backgroundSize: "96px auto",
+  backgroundPosition: "left center",
+  backgroundRepeat: "no-repeat",
+  filter: "invert(1)",
 };
 
 interface Props {
   context: SidebarContext;
+}
+
+function ImageGallery({
+  images,
+  cityName,
+}: {
+  images: string[];
+  cityName: string;
+}) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  if (images.length === 1) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={images[0]}
+        alt={cityName}
+        className="w-full flex-shrink-0 object-cover"
+        style={{ height: "260px" }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex-shrink-0" style={{ height: "260px" }}>
+      <div className="relative w-full h-full">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={images[activeIndex]}
+          alt={`${cityName} ${activeIndex + 1}`}
+          className="w-full h-full object-cover"
+        />
+        <button
+          onClick={() =>
+            setActiveIndex((i) => (i - 1 + images.length) % images.length)
+          }
+          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-sm"
+        >
+          ‹
+        </button>
+        <button
+          onClick={() => setActiveIndex((i) => (i + 1) % images.length)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors text-sm"
+        >
+          ›
+        </button>
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+          {images.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveIndex(i)}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === activeIndex ? "bg-white" : "bg-white/50"}`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function DynamicSidebar({ context }: Props) {
@@ -86,15 +302,18 @@ export function DynamicSidebar({ context }: Props) {
         >
           ← 戻る
         </button>
+        <ImageGallery images={focusedCity.images} cityName={focusedCity.name} />
         <iframe
           src={`https://www.google.com/maps?q=${encodeURIComponent(focusedCity.mapQuery)}&output=embed`}
           className="w-full flex-shrink-0"
-          style={{ height: '260px', border: 'none' }}
+          style={{ height: "200px", border: "none" }}
           loading="lazy"
           title={focusedCity.name}
         />
         <div className="p-4 border-t border-border">
-          <div className="text-lg font-bold text-primary">{focusedCity.flag} {focusedCity.name}</div>
+          <div className="text-lg font-bold text-primary">
+            {focusedCity.flag} {focusedCity.name}
+          </div>
           <div className="text-sm text-muted">{focusedCity.country}</div>
         </div>
       </div>
@@ -105,19 +324,33 @@ export function DynamicSidebar({ context }: Props) {
     <div className="flex flex-col overflow-y-auto h-full">
       {showAgents && (
         <div className="px-4 pt-4 pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">おすすめエージェント</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
+            おすすめエージェント
+          </p>
           <div className="flex flex-col gap-2">
-            {AGENTS.map(agent => (
-              <div key={agent.id} className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
+            {AGENTS.map((agent) => (
+              <div
+                key={agent.id}
+                className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-sm font-semibold text-primary">{agent.name}</div>
-                    <div className="text-xs text-muted mt-0.5">{agent.specialty}</div>
+                    <div className="text-sm font-semibold text-primary">
+                      {agent.name}
+                    </div>
+                    <div className="text-xs text-muted mt-0.5">
+                      {agent.specialty}
+                    </div>
                   </div>
-                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full whitespace-nowrap">{agent.badge}</span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full whitespace-nowrap">
+                    {agent.badge}
+                  </span>
                 </div>
                 <div className="text-xs text-amber-500 mt-1.5">
-                  ★ {agent.rating} <span className="text-muted">({agent.reviews.toLocaleString()}件)</span>
+                  ★ {agent.rating}{" "}
+                  <span className="text-muted">
+                    ({agent.reviews.toLocaleString()}件)
+                  </span>
                 </div>
               </div>
             ))}
@@ -127,21 +360,34 @@ export function DynamicSidebar({ context }: Props) {
 
       {cities.length > 0 && (
         <div className="px-4 pt-4 pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">候補の都市</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
+            候補の都市
+          </p>
           <div className="grid grid-cols-2 gap-2">
-            {cities.slice(0, 6).map(city => (
+            {cities.slice(0, 6).map((city) => (
               <button
                 key={city.name}
                 onClick={() => setFocusedCity(city)}
                 className="relative overflow-hidden rounded-xl group"
-                style={{ aspectRatio: '247 / 164' }}
+                style={{ aspectRatio: "247 / 164" }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={city.image} alt={city.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <img
+                  src={city.images[0]}
+                  alt={city.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 p-2 text-left">
-                  <div className="text-white text-xs font-bold leading-tight">{city.flag} {city.name}</div>
+                  <div className="text-white text-xs font-bold leading-tight">
+                    {city.flag} {city.name}
+                  </div>
                 </div>
+                {city.images.length > 1 && (
+                  <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                    +{city.images.length - 1}
+                  </div>
+                )}
               </button>
             ))}
           </div>
@@ -150,15 +396,27 @@ export function DynamicSidebar({ context }: Props) {
 
       {countries.length > 0 && (
         <div className="px-4 pt-4 pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">候補の国</p>
+          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
+            候補の国
+          </p>
           <div className="grid grid-cols-2 gap-2">
-            {countries.slice(0, 4).map(country => (
-              <div key={country.name} className="relative overflow-hidden rounded-xl group cursor-pointer" style={{ aspectRatio: '247 / 164' }}>
+            {countries.slice(0, 4).map((country) => (
+              <div
+                key={country.name}
+                className="relative overflow-hidden rounded-xl group cursor-pointer"
+                style={{ aspectRatio: "247 / 164" }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={country.image} alt={country.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <img
+                  src={country.images[0]}
+                  alt={country.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 p-2">
-                  <div className="text-white text-xs font-bold leading-tight">{country.flag} {country.name}</div>
+                  <div className="text-white text-xs font-bold leading-tight">
+                    {country.flag} {country.name}
+                  </div>
                 </div>
               </div>
             ))}

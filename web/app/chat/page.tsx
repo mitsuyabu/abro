@@ -35,7 +35,14 @@ function detectSidebarContext(content: string): SidebarContext {
   return { cities, countries, showAgents };
 }
 
-function getContextSuggestions(context: SidebarContext): string[] {
+function parseChoices(content: string): string[] {
+  const regex = /[①②③④⑤⑥]\s*.{2,25}/g;
+  return (content.match(regex) || []).slice(0, 6).map(s => s.trim());
+}
+
+function getContextSuggestions(context: SidebarContext, latestAI: string): string[] {
+  const choices = parseChoices(latestAI);
+  if (choices.length >= 2) return choices;
   if (context.cities.length > 0) {
     const city = context.cities[0].name;
     return [`${city}の費用を詳しく教えて`, `${city}での仕事の探し方`, `${city}の語学学校は？`, '他の都市と比べてみて'];
@@ -99,7 +106,8 @@ export default function ChatPage() {
   };
 
   const isEmpty = messages.length === 0;
-  const suggestions = isEmpty ? DEFAULT_SUGGESTIONS : getContextSuggestions(sidebarContext);
+  const latestAI = messages.filter(m => m.role === 'assistant').at(-1)?.content ?? '';
+  const suggestions = isEmpty ? DEFAULT_SUGGESTIONS : getContextSuggestions(sidebarContext, latestAI);
 
   const sidebarLabel =
     sidebarContext.showAgents ? 'エージェント' :
