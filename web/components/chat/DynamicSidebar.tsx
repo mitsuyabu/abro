@@ -216,13 +216,7 @@ const AGENTS = [
   },
 ];
 
-const AVATAR_STYLE: React.CSSProperties = {
-  backgroundImage: "url(/logo.png)",
-  backgroundSize: "96px auto",
-  backgroundPosition: "left center",
-  backgroundRepeat: "no-repeat",
-  filter: "invert(1)",
-};
+const AVATAR_STYLE: React.CSSProperties = {};
 
 interface Props {
   context: SidebarContext;

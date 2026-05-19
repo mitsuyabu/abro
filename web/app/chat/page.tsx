@@ -54,7 +54,7 @@ function getContextSuggestions(context: SidebarContext, latestAI: string): strin
   return DEFAULT_SUGGESTIONS;
 }
 
-const avatarStyle: React.CSSProperties = AVATAR_STYLE;
+const avatarStyle: React.CSSProperties = AVATAR_STYLE; // unused but kept for type compat
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -179,9 +179,11 @@ export default function ChatPage() {
               {messages.map(msg => (
                 <div key={msg.id} className={`flex gap-2 sm:gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {msg.role === 'assistant' && (
-                    <div
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary flex-shrink-0 mt-0.5 overflow-hidden"
-                      style={avatarStyle}
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src="/mascot.png"
+                      alt="Abro"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 mt-0.5 object-contain bg-white"
                     />
                   )}
                   <div
@@ -203,7 +205,8 @@ export default function ChatPage() {
 
               {isLoading && messages[messages.length - 1]?.content === '' && (
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary flex-shrink-0 overflow-hidden" style={avatarStyle} />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/mascot.png" alt="Abro" className="w-8 h-8 rounded-full flex-shrink-0 object-contain bg-white" />
                   <div className="bg-white border border-border rounded-2xl rounded-bl-md px-4 py-2.5 flex gap-1 items-center">
                     <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
