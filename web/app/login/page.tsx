@@ -1,8 +1,13 @@
 'use client';
 
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 function LoginContent() {
   const searchParams = useSearchParams();
@@ -13,23 +18,26 @@ function LoginContent() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setAuthError(null);
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        skipBrowserRedirect: true,
-      },
-    });
-    if (error) {
-      setAuthError(error.message);
-      setLoading(false);
-      return;
-    }
-    if (data?.url) {
-      window.location.href = data.url;
-    } else {
-      setAuthError('ログインURLの取得に失敗しました。Supabaseの設定を確認してください。');
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        setAuthError(error.message);
+        setLoading(false);
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setAuthError('ログインURLの取得に失敗しました。');
+        setLoading(false);
+      }
+    } catch (e) {
+      setAuthError(`エラーが発生しました: ${String(e)}`);
       setLoading(false);
     }
   };
@@ -52,7 +60,7 @@ function LoginContent() {
           </div>
 
           {(error || authError) && (
-            <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl text-center">
+            <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl text-center break-all">
               {authError ?? 'ログインに失敗しました。もう一度お試しください。'}
             </div>
           )}
@@ -62,7 +70,6 @@ function LoginContent() {
             disabled={loading}
             className="w-full flex items-center justify-center gap-3 bg-white border border-border hover:border-primary/30 hover:shadow-sm text-primary font-medium py-3 px-4 rounded-2xl transition-all disabled:opacity-60"
           >
-            {/* Google icon */}
             <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M47.532 24.5528C47.532 22.9214 47.3997 21.2811 47.1175 19.6761H24.48V28.9181H37.4434C36.9055 31.8988 35.177 34.5356 32.6461 36.2111V42.2078H40.3801C44.9217 38.0278 47.532 31.8547 47.532 24.5528Z" fill="#4285F4"/>
               <path d="M24.48 48.0016C30.9529 48.0016 36.4116 45.8764 40.3888 42.2078L32.6549 36.2111C30.5031 37.675 27.7252 38.5039 24.4888 38.5039C18.2275 38.5039 12.9187 34.2798 11.0139 28.6006H3.03296V34.7825C7.10718 42.8868 15.4056 48.0016 24.48 48.0016Z" fill="#34A853"/>
