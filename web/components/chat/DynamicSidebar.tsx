@@ -478,8 +478,6 @@ export function DynamicSidebar({ context }: Props) {
   if (focusedSchool) {
     return <SchoolDetailPanel school={focusedSchool} onBack={() => setFocusedSchool(null)} />;
   }
-    );
-  }
 
   if (focusedCity) {
     return (
