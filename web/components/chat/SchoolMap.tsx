@@ -1,6 +1,7 @@
 'use client';
 
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SchoolItem } from './DynamicSidebar';
 
@@ -18,15 +19,32 @@ const CITY_COORDS: Record<string, [number, number]> = {
   'セブ':           [10.3157, 123.8854],
 };
 
+interface SchoolWithPos {
+  school: SchoolItem;
+  pos: [number, number];
+}
+
+function FlyToSchool({ schoolsWithPos, hoveredSchoolId }: { schoolsWithPos: SchoolWithPos[]; hoveredSchoolId?: string }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!hoveredSchoolId) return;
+    const target = schoolsWithPos.find(s => s.school.id === hoveredSchoolId);
+    if (target) {
+      map.flyTo(target.pos, 14, { duration: 0.5 });
+    }
+  }, [hoveredSchoolId, map, schoolsWithPos]);
+  return null;
+}
+
 interface Props {
   schools: SchoolItem[];
   onSelect: (school: SchoolItem) => void;
+  hoveredSchoolId?: string;
 }
 
-export default function SchoolMap({ schools, onSelect }: Props) {
-  const schoolsWithPos = schools.map((school, i) => {
+export default function SchoolMap({ schools, onSelect, hoveredSchoolId }: Props) {
+  const schoolsWithPos: SchoolWithPos[] = schools.map((school, i) => {
     const base = CITY_COORDS[school.city] ?? [-25, 133];
-    // 同じ都市の学校はずらして表示
     const sameCity = schools.slice(0, i).filter(s => s.city === school.city).length;
     return {
       school,
@@ -52,48 +70,52 @@ export default function SchoolMap({ schools, onSelect }: Props) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
       />
-      {schoolsWithPos.map(({ school, pos }) => (
-        <CircleMarker
-          key={school.id}
-          center={pos}
-          radius={9}
-          pathOptions={{
-            color: 'white',
-            fillColor: '#1A1A1A',
-            fillOpacity: 1,
-            weight: 2,
-          }}
-          eventHandlers={{ click: () => onSelect(school) }}
-        >
-          <Popup>
-            <div style={{ minWidth: '160px', fontFamily: 'sans-serif' }}>
-              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{school.name}</div>
-              <div style={{ color: '#888', fontSize: '11px' }}>{school.city} · {school.type}</div>
-              {school.fee_per_week && (
-                <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>
-                  ¥{school.fee_per_week.toLocaleString()}/週
-                </div>
-              )}
-              <button
-                onClick={() => onSelect(school)}
-                style={{
-                  marginTop: '8px',
-                  background: '#1A1A1A',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '5px 10px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  width: '100%',
-                }}
-              >
-                詳細を見る
-              </button>
-            </div>
-          </Popup>
-        </CircleMarker>
-      ))}
+      <FlyToSchool schoolsWithPos={schoolsWithPos} hoveredSchoolId={hoveredSchoolId} />
+      {schoolsWithPos.map(({ school, pos }) => {
+        const isHovered = school.id === hoveredSchoolId;
+        return (
+          <CircleMarker
+            key={school.id}
+            center={pos}
+            radius={isHovered ? 14 : 9}
+            pathOptions={{
+              color: 'white',
+              fillColor: isHovered ? '#FF5A00' : '#1A1A1A',
+              fillOpacity: 1,
+              weight: isHovered ? 3 : 2,
+            }}
+            eventHandlers={{ click: () => onSelect(school) }}
+          >
+            <Popup>
+              <div style={{ minWidth: '160px', fontFamily: 'sans-serif' }}>
+                <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{school.name}</div>
+                <div style={{ color: '#888', fontSize: '11px' }}>{school.city} · {school.type}</div>
+                {school.fee_per_week && (
+                  <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>
+                    ¥{school.fee_per_week.toLocaleString()}/週
+                  </div>
+                )}
+                <button
+                  onClick={() => onSelect(school)}
+                  style={{
+                    marginTop: '8px',
+                    background: '#1A1A1A',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '5px 10px',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  詳細を見る
+                </button>
+              </div>
+            </Popup>
+          </CircleMarker>
+        );
+      })}
     </MapContainer>
   );
 }

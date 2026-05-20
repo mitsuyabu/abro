@@ -90,12 +90,29 @@ function detectSidebarContext(content: string, allSchools: SchoolItem[]): Sideba
   // 名前で一致する学校
   const schoolsByName = allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
 
-  // 学校トピックが話されており、かつ都市が検出されていたら、その都市のSupabase登録学校も表示
+  // 学校トピックが話されている場合、都市の言及頻度を計算してフォーカス都市を決定
   const mentionsSchoolTopic =
     content.includes('語学学校') || content.includes('学校') || lowerContent.includes('school');
-  const detectedCityNames = new Set(cities.map(c => c.name));
-  const schoolsByCity = mentionsSchoolTopic && detectedCityNames.size > 0
-    ? allSchools.filter(s => detectedCityNames.has(s.city))
+
+  let targetCityNames: Set<string>;
+  if (cities.length > 1) {
+    // 複数都市が検出された場合：最も多く言及された都市を優先
+    const cityCounts = cities.map(c => ({
+      name: c.name,
+      count: (content.match(new RegExp(c.name, 'g')) || []).length,
+    }));
+    const maxCount = Math.max(...cityCounts.map(c => c.count));
+    const dominant = cityCounts.filter(c => c.count >= maxCount * 0.8);
+    // 1都市が支配的ならその都市のみ、そうでなければ全都市
+    targetCityNames = new Set(
+      dominant.length === 1 ? [dominant[0].name] : cities.map(c => c.name)
+    );
+  } else {
+    targetCityNames = new Set(cities.map(c => c.name));
+  }
+
+  const schoolsByCity = mentionsSchoolTopic && targetCityNames.size > 0
+    ? allSchools.filter(s => targetCityNames.has(s.city))
     : [];
 
   // 重複排除してマージ

@@ -300,6 +300,7 @@ function ImageGallery({
 export function DynamicSidebar({ context }: Props) {
   const [focusedCity, setFocusedCity] = useState<CityItem | null>(null);
   const [focusedSchool, setFocusedSchool] = useState<SchoolItem | null>(null);
+  const [hoveredSchool, setHoveredSchool] = useState<SchoolItem | null>(null);
   const { countries, cities, schools, showAgents } = context;
   const hasContext = countries.length > 0 || cities.length > 0 || schools.length > 0 || showAgents;
 
@@ -458,14 +459,24 @@ export function DynamicSidebar({ context }: Props) {
             語学学校
           </p>
           {/* マップ */}
-          <SchoolMap schools={schools} onSelect={setFocusedSchool} />
+          <SchoolMap
+            schools={schools}
+            onSelect={setFocusedSchool}
+            hoveredSchoolId={hoveredSchool?.id}
+          />
           {/* 学校カードリスト */}
           <div className="flex flex-col gap-2 px-4 pt-3">
             {schools.map((school) => (
               <button
                 key={school.id}
                 onClick={() => setFocusedSchool(school)}
-                className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all text-left w-full"
+                onMouseEnter={() => setHoveredSchool(school)}
+                onMouseLeave={() => setHoveredSchool(null)}
+                className={`border rounded-xl p-3 transition-all text-left w-full ${
+                  hoveredSchool?.id === school.id
+                    ? 'bg-primary/5 border-primary/40 shadow-sm'
+                    : 'bg-white border-border hover:border-primary/30 hover:shadow-sm'
+                }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
