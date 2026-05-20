@@ -86,7 +86,22 @@ function detectSidebarContext(content: string, allSchools: SchoolItem[]): Sideba
     content.includes('エージェント') &&
     (content.includes('相談') || content.includes('おすすめ') || content.includes('提案') || content.includes('紹介'));
   const lowerContent = content.toLowerCase();
-  const schools = allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
+
+  // 名前で一致する学校
+  const schoolsByName = allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
+
+  // 学校トピックが話されており、かつ都市が検出されていたら、その都市のSupabase登録学校も表示
+  const mentionsSchoolTopic =
+    content.includes('語学学校') || content.includes('学校') || lowerContent.includes('school');
+  const detectedCityNames = new Set(cities.map(c => c.name));
+  const schoolsByCity = mentionsSchoolTopic && detectedCityNames.size > 0
+    ? allSchools.filter(s => detectedCityNames.has(s.city))
+    : [];
+
+  // 重複排除してマージ
+  const merged = new Map([...schoolsByName, ...schoolsByCity].map(s => [s.id, s]));
+  const schools = [...merged.values()];
+
   return { cities, countries, schools, showAgents };
 }
 
@@ -121,8 +136,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetch('/api/schools').then(r => r.json()).then(data => {
-      if (Array.isArray(data)) setAllSchools(data);
-    }).catch(() => {});
+      if (Array.isArray(data)) {
+        setAllSchools(data);
+        console.log('[Abro] schools loaded:', data.length, data.map((s: SchoolItem) => s.name));
+      } else {
+        console.warn('[Abro] schools API returned non-array:', data);
+      }
+    }).catch(e => console.error('[Abro] schools fetch error:', e));
   }, []);
 
   useEffect(() => {
