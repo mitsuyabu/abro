@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem } from '@/components/chat/DynamicSidebar';
+import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
 
 const ACTION_CHIPS = [
   { id: 'plan',  emoji: '✨', label: 'プランを作る',    prompt: 'ワーホリ・留学のプランを一緒に考えたいです。' },
@@ -23,6 +23,57 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  context?: SidebarContext;
+}
+
+function InlineCityCards({ cities }: { cities: CityItem[] }) {
+  return (
+    <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+      {cities.map(city => (
+        <div
+          key={city.name}
+          className="flex-shrink-0 w-32 rounded-2xl overflow-hidden shadow-sm border border-border/60 cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <div className="relative h-20">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={city.images[0]} alt={city.name} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
+            <div className="absolute bottom-1.5 left-2 text-white text-[11px] font-bold leading-tight">
+              {city.flag} {city.name}
+            </div>
+          </div>
+          <div className="px-2 py-1.5 bg-white">
+            <div className="text-[10px] text-muted">{city.country}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InlineSchoolCards({ schools }: { schools: SchoolItem[] }) {
+  return (
+    <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+      {schools.map(school => (
+        <div
+          key={school.id}
+          className="flex-shrink-0 w-44 rounded-2xl border border-border bg-white p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+        >
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="text-base">🎓</span>
+            {school.is_partner && (
+              <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">提携校</span>
+            )}
+          </div>
+          <div className="text-xs font-semibold text-primary leading-tight line-clamp-2 mb-0.5">{school.name}</div>
+          <div className="text-[10px] text-muted">{school.city} · {school.type}</div>
+          {school.fee_per_week && (
+            <div className="text-xs font-semibold text-primary mt-1.5">¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span></div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function detectSidebarContext(content: string, allSchools: SchoolItem[]): SidebarContext {
@@ -105,7 +156,9 @@ export default function ChatPage() {
         setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: m.content + chunk } : m));
       }
 
-      setSidebarContext(detectSidebarContext(fullContent, allSchools));
+      const ctx = detectSidebarContext(fullContent, allSchools);
+      setSidebarContext(ctx);
+      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx } : m));
     } catch {
       setMessages(prev =>
         prev.map(m => m.id === aiId ? { ...m, content: 'エラーが発生しました。もう一度お試しください。' } : m)
@@ -188,29 +241,44 @@ export default function ChatPage() {
           ) : (
             <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6 flex flex-col gap-5">
               {messages.map(msg => (
-                <div key={msg.id} className={`flex gap-2 sm:gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {msg.role === 'assistant' && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src="/mascot.png"
-                      alt="Abro"
-                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 mt-0.5 object-contain bg-white"
-                    />
-                  )}
-                  <div
-                    className={`max-w-[80%] sm:max-w-[75%] px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'bg-primary text-white rounded-br-md'
-                        : 'text-primary rounded-bl-md'
-                    }`}
-                    style={{ fontSize: '14px' }}
-                  >
-                    {msg.role === 'assistant' ? (
-                      <div className="prose max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-h1:text-[17px] prose-h2:text-[17px] prose-h3:text-[17px] sm:prose-h1:text-[18.75px] sm:prose-h2:text-[18.75px] sm:prose-h3:text-[18.75px] prose-h1:font-bold prose-h2:font-bold prose-h3:font-bold prose-p:text-[14px] prose-li:text-[14px] sm:prose-p:text-[15px] sm:prose-li:text-[15px]">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
-                    ) : msg.content}
+                <div key={msg.id}>
+                  <div className={`flex gap-2 sm:gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.role === 'assistant' && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src="/mascot.png"
+                        alt="Abro"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex-shrink-0 mt-0.5 object-contain bg-white"
+                      />
+                    )}
+                    <div
+                      className={`max-w-[80%] sm:max-w-[75%] px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-primary text-white rounded-br-md'
+                          : 'text-primary rounded-bl-md'
+                      }`}
+                      style={{ fontSize: '14px' }}
+                    >
+                      {msg.role === 'assistant' ? (
+                        <div className="prose max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-h1:text-[17px] prose-h2:text-[17px] prose-h3:text-[17px] sm:prose-h1:text-[18.75px] sm:prose-h2:text-[18.75px] sm:prose-h3:text-[18.75px] prose-h1:font-bold prose-h2:font-bold prose-h3:font-bold prose-p:text-[14px] prose-li:text-[14px] sm:prose-p:text-[15px] sm:prose-li:text-[15px]">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      ) : msg.content}
+                    </div>
                   </div>
+                  {/* インラインカード（AI返答の下） */}
+                  {msg.role === 'assistant' && msg.context && (
+                    (msg.context.cities.length > 0 || msg.context.schools.length > 0) && (
+                      <div className="mt-2 pl-9 sm:pl-11 flex flex-col gap-2">
+                        {msg.context.cities.length > 0 && (
+                          <InlineCityCards cities={msg.context.cities} />
+                        )}
+                        {msg.context.schools.length > 0 && (
+                          <InlineSchoolCards schools={msg.context.schools} />
+                        )}
+                      </div>
+                    )
+                  )}
                 </div>
               ))}
 
