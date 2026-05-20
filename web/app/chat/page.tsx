@@ -57,26 +57,51 @@ function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text
 
 function InlineSchoolCards({ schools, onSend }: { schools: SchoolItem[]; onSend: (text: string) => void }) {
   return (
-    <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-      {schools.map(school => (
-        <button
-          key={school.id}
-          onClick={() => onSend(`${school.name}（${school.city}）について詳しく教えてください。`)}
-          className="flex-shrink-0 w-44 rounded-2xl border border-border bg-white p-3 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all text-left"
-        >
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-base">🎓</span>
-            {school.is_partner && (
-              <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">提携校</span>
-            )}
-          </div>
-          <div className="text-xs font-semibold text-primary leading-tight line-clamp-2 mb-0.5">{school.name}</div>
-          <div className="text-[10px] text-muted">{school.city} · {school.type}</div>
-          {school.fee_per_week && (
-            <div className="text-xs font-semibold text-primary mt-1.5">¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span></div>
-          )}
-        </button>
-      ))}
+    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+      {schools.map(school => {
+        const photo = school.google_photos?.[0];
+        return (
+          <button
+            key={school.id}
+            onClick={() => onSend(`${school.name}（${school.city}）について詳しく教えてください。`)}
+            className="flex-shrink-0 w-64 rounded-2xl border border-border bg-white shadow-sm hover:shadow-md hover:scale-[1.01] transition-all text-left overflow-hidden"
+          >
+            {/* 画像 */}
+            <div className="relative h-36 bg-gray-100">
+              {photo ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={photo} alt={school.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-3xl">🎓</div>
+              )}
+              {school.is_partner && (
+                <span className="absolute top-2 left-2 text-[9px] bg-primary text-white px-2 py-0.5 rounded-full">提携校</span>
+              )}
+              {school.rating != null && (
+                <span className="absolute top-2 right-2 text-[11px] font-semibold bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-amber-500">
+                  ★ {Number(school.rating).toFixed(1)}
+                </span>
+              )}
+            </div>
+            {/* コンテンツ */}
+            <div className="p-3">
+              <div className="text-xs font-bold text-primary leading-snug line-clamp-2">{school.name}</div>
+              <div className="text-[10px] text-muted mt-0.5">{school.city} · {school.type}</div>
+              {school.review_count != null && (
+                <div className="text-[10px] text-muted mt-0.5">{Number(school.review_count).toLocaleString()}件のレビュー</div>
+              )}
+              {school.fee_per_week && (
+                <div className="text-sm font-bold text-primary mt-1.5">
+                  ¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span>
+                </div>
+              )}
+              <div className="mt-2 w-full bg-primary text-white text-[11px] font-semibold py-1.5 rounded-xl text-center">
+                詳細を見る →
+              </div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }

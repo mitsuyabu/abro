@@ -313,6 +313,159 @@ function ImageGallery({
   );
 }
 
+function SchoolDetailPanel({ school, onBack }: { school: SchoolItem; onBack: () => void }) {
+  const [tab, setTab] = useState<'overview' | 'reviews' | 'location'>('overview');
+  const photos = school.google_photos?.length ? school.google_photos : school.images;
+  const reviews = school.google_reviews ?? [];
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ヘッダー */}
+      <div className="flex-shrink-0 border-b border-border">
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <button onClick={onBack} className="text-sm text-muted hover:text-primary transition-colors">← 戻る</button>
+          {school.website && (
+            <a href={school.website} target="_blank" rel="noopener noreferrer"
+              className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity">
+              公式サイト →
+            </a>
+          )}
+        </div>
+        <div className="px-4 pb-3">
+          <h2 className="text-base font-bold text-primary leading-snug">{school.name}</h2>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-xs text-muted">{school.city} · {school.type}</span>
+            {school.rating != null && (
+              <span className="text-xs text-amber-500 font-semibold">★ {Number(school.rating).toFixed(1)}</span>
+            )}
+            {school.review_count != null && (
+              <span className="text-xs text-muted">{Number(school.review_count).toLocaleString()}件</span>
+            )}
+            {school.is_partner && (
+              <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full">提携校</span>
+            )}
+          </div>
+        </div>
+        {/* タブ */}
+        <div className="flex border-t border-border">
+          {(['overview', 'reviews', 'location'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
+                tab === t ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-primary'
+              }`}
+            >
+              {t === 'overview' ? '概要' : t === 'reviews' ? 'レビュー' : '場所'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* コンテンツ */}
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'overview' && (
+          <div>
+            {/* 写真グリッド */}
+            {photos.length > 0 && (
+              <div className="grid gap-0.5" style={{ gridTemplateColumns: photos.length === 1 ? '1fr' : '2fr 1fr' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photos[0]} alt={school.name} className="w-full object-cover" style={{ height: '180px' }} />
+                {photos.length > 1 && (
+                  <div className="flex flex-col gap-0.5">
+                    {photos.slice(1, 3).map((url, i) => (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img key={i} src={url} alt={`${school.name} ${i + 2}`}
+                        className="w-full object-cover flex-1" style={{ height: '89px' }} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="p-4 flex flex-col gap-4">
+              {school.fee_per_week && (
+                <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                  <span className="text-xs text-muted">週あたり学費の目安</span>
+                  <span className="text-lg font-bold text-primary">¥{school.fee_per_week.toLocaleString()}<span className="text-xs font-normal text-muted">/週</span></span>
+                </div>
+              )}
+              {school.description && (
+                <p className="text-sm text-primary leading-relaxed">{school.description}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'reviews' && (
+          <div className="p-4">
+            {school.rating != null && (
+              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
+                <div className="text-4xl font-bold text-primary">{Number(school.rating).toFixed(1)}</div>
+                <div>
+                  <div className="text-amber-500 text-lg">{'★'.repeat(Math.round(Number(school.rating)))}</div>
+                  {school.review_count != null && (
+                    <div className="text-xs text-muted">{Number(school.review_count).toLocaleString()}件のレビュー</div>
+                  )}
+                </div>
+              </div>
+            )}
+            {reviews.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {reviews.map((r, i) => (
+                  <div key={i} className="border border-border rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      {r.author_photo ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={r.author_photo} alt={r.author} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">{r.author[0]}</div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-primary truncate">{r.author}</div>
+                        <div className="text-[10px] text-muted">{r.time}</div>
+                      </div>
+                      <div className="text-amber-500 text-xs flex-shrink-0">{'★'.repeat(r.rating)}</div>
+                    </div>
+                    {r.text && <p className="text-xs text-primary leading-relaxed">{r.text}</p>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted text-center py-8">レビューはまだありません</p>
+            )}
+          </div>
+        )}
+
+        {tab === 'location' && (
+          <div className="p-4 flex flex-col gap-3">
+            {school.latitude != null && school.longitude != null ? (
+              <iframe
+                src={`https://www.google.com/maps?q=${school.latitude},${school.longitude}&output=embed`}
+                className="w-full rounded-xl border border-border"
+                style={{ height: '220px', border: 'none' }}
+                loading="lazy"
+                title={school.name}
+              />
+            ) : (
+              <iframe
+                src={`https://www.google.com/maps?q=${encodeURIComponent(school.name + ' ' + school.city)}&output=embed`}
+                className="w-full rounded-xl border border-border"
+                style={{ height: '220px', border: 'none' }}
+                loading="lazy"
+                title={school.name}
+              />
+            )}
+            <div className="flex items-start gap-2 text-sm text-primary">
+              <span className="mt-0.5">📍</span>
+              <span>{school.name}, {school.city}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function DynamicSidebar({ context }: Props) {
   const [focusedCity, setFocusedCity] = useState<CityItem | null>(null);
   const [focusedSchool, setFocusedSchool] = useState<SchoolItem | null>(null);
@@ -323,100 +476,8 @@ export function DynamicSidebar({ context }: Props) {
   if (!hasContext) return <RecommendationPanel />;
 
   if (focusedSchool) {
-    const photos = focusedSchool.google_photos?.length ? focusedSchool.google_photos : focusedSchool.images;
-    const reviews = focusedSchool.google_reviews ?? [];
-    return (
-      <div className="flex flex-col h-full overflow-y-auto">
-        <button
-          onClick={() => setFocusedSchool(null)}
-          className="flex items-center gap-1 px-4 py-3 text-sm text-muted hover:text-primary transition-colors flex-shrink-0"
-        >
-          ← 戻る
-        </button>
-
-        {/* Photos */}
-        {photos.length > 0 && (
-          <div className="flex gap-1 px-4 pb-1 overflow-x-auto scrollbar-hide flex-shrink-0">
-            {photos.map((url, i) => (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                key={i}
-                src={url}
-                alt={`${focusedSchool.name} photo ${i + 1}`}
-                className="h-28 w-40 object-cover rounded-xl flex-shrink-0"
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="p-4 flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-bold text-primary">{focusedSchool.name}</h2>
-              <p className="text-sm text-muted mt-0.5">{focusedSchool.city} · {focusedSchool.type}</p>
-              {focusedSchool.rating != null && (
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-amber-500 text-sm">★ {Number(focusedSchool.rating).toFixed(1)}</span>
-                  {focusedSchool.review_count != null && (
-                    <span className="text-xs text-muted">({Number(focusedSchool.review_count).toLocaleString()}件のレビュー)</span>
-                  )}
-                </div>
-              )}
-            </div>
-            {focusedSchool.is_partner && (
-              <span className="text-[10px] bg-primary text-white px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0">提携校</span>
-            )}
-          </div>
-
-          {focusedSchool.fee_per_week && (
-            <div className="bg-background rounded-xl p-3">
-              <p className="text-xs text-muted">週あたり学費の目安</p>
-              <p className="text-xl font-bold text-primary mt-0.5">¥{focusedSchool.fee_per_week.toLocaleString()}<span className="text-sm font-normal text-muted"> /週</span></p>
-            </div>
-          )}
-
-          {focusedSchool.description && (
-            <p className="text-sm text-primary leading-relaxed">{focusedSchool.description}</p>
-          )}
-
-          {reviews.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Googleレビュー</p>
-              <div className="flex flex-col gap-3">
-                {reviews.slice(0, 3).map((r, i) => (
-                  <div key={i} className="bg-background rounded-xl p-3">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      {r.author_photo ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={r.author_photo} alt={r.author} className="w-6 h-6 rounded-full object-cover" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">{r.author[0]}</div>
-                      )}
-                      <div>
-                        <span className="text-xs font-semibold text-primary">{r.author}</span>
-                        <span className="text-[10px] text-muted ml-1.5">{r.time}</span>
-                      </div>
-                      <span className="ml-auto text-amber-500 text-xs">{'★'.repeat(r.rating)}</span>
-                    </div>
-                    {r.text && <p className="text-xs text-primary leading-relaxed line-clamp-4">{r.text}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {focusedSchool.website && (
-            <a
-              href={focusedSchool.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full bg-primary text-white text-center py-3 rounded-2xl text-sm font-medium hover:opacity-80 transition-opacity block"
-            >
-              公式サイトを見る →
-            </a>
-          )}
-        </div>
-      </div>
+    return <SchoolDetailPanel school={focusedSchool} onBack={() => setFocusedSchool(null)} />;
+  }
     );
   }
 
