@@ -5,6 +5,7 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 
 const SchoolMap = dynamic(() => import("./SchoolMap"), { ssr: false });
+const SidebarMap = dynamic(() => import("./SidebarMap"), { ssr: false });
 
 export interface CountryItem {
   name: string;
@@ -379,6 +380,108 @@ export function DynamicSidebar({ context }: Props) {
     );
   }
 
+  // 都市または学校がある場合：全面マップ + 下部カード
+  const hasLocationContext = cities.length > 0 || schools.length > 0;
+
+  if (hasLocationContext) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* 全面マップ */}
+        <div className="flex-1 min-h-0">
+          <SidebarMap
+            cities={cities}
+            schools={schools}
+            onSelectCity={setFocusedCity}
+            onSelectSchool={setFocusedSchool}
+            hoveredSchoolId={hoveredSchool?.id}
+          />
+        </div>
+
+        {/* 下部カードエリア */}
+        <div className="flex-shrink-0 border-t border-border bg-background overflow-y-auto" style={{ maxHeight: '260px' }}>
+          {/* 都市カード（横スクロール） */}
+          {cities.length > 0 && (
+            <div className="px-3 pt-3 pb-1">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">候補の都市</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {cities.map((city) => (
+                  <button
+                    key={city.name}
+                    onClick={() => setFocusedCity(city)}
+                    className="flex-shrink-0 w-28 rounded-xl overflow-hidden border border-border/60 hover:shadow-md hover:scale-[1.02] transition-all"
+                  >
+                    <div className="relative h-16">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={city.images[0]} alt={city.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
+                      <div className="absolute bottom-1 left-1.5 text-white text-[10px] font-bold">{city.flag} {city.name}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 学校カード */}
+          {schools.length > 0 && (
+            <div className="px-3 pt-2 pb-3 flex flex-col gap-1.5">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-1">語学学校</p>
+              {schools.map((school) => (
+                <button
+                  key={school.id}
+                  onClick={() => setFocusedSchool(school)}
+                  onMouseEnter={() => setHoveredSchool(school)}
+                  onMouseLeave={() => setHoveredSchool(null)}
+                  className={`border rounded-xl px-3 py-2 transition-all text-left w-full ${
+                    hoveredSchool?.id === school.id
+                      ? 'bg-primary/5 border-primary/40 shadow-sm'
+                      : 'bg-white border-border hover:border-primary/30 hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-primary truncate">{school.name}</span>
+                        {school.is_partner && (
+                          <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">提携</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-muted">{school.city} · {school.type}</div>
+                    </div>
+                    {school.fee_per_week && (
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-xs font-semibold text-primary">¥{school.fee_per_week.toLocaleString()}</span>
+                        <span className="text-[10px] text-muted">/週</span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* エージェント（ロケーションと同時表示） */}
+          {showAgents && (
+            <div className="px-3 pb-3">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">おすすめエージェント</p>
+              {AGENTS.map((agent) => (
+                <div key={agent.id} className="bg-white border border-border rounded-xl p-2.5 mb-1.5 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-semibold text-primary">{agent.name}</div>
+                      <div className="text-[10px] text-muted">{agent.specialty}</div>
+                    </div>
+                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full whitespace-nowrap">{agent.badge}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col overflow-y-auto h-full">
       {showAgents && (
@@ -394,111 +497,13 @@ export function DynamicSidebar({ context }: Props) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-sm font-semibold text-primary">
-                      {agent.name}
-                    </div>
-                    <div className="text-xs text-muted mt-0.5">
-                      {agent.specialty}
-                    </div>
+                    <div className="text-sm font-semibold text-primary">{agent.name}</div>
+                    <div className="text-xs text-muted mt-0.5">{agent.specialty}</div>
                   </div>
-                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full whitespace-nowrap">
-                    {agent.badge}
-                  </span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full whitespace-nowrap">{agent.badge}</span>
                 </div>
-                <div className="text-xs text-amber-500 mt-1.5">
-                  ★ {agent.rating}{" "}
-                  <span className="text-muted">
-                    ({agent.reviews.toLocaleString()}件)
-                  </span>
-                </div>
+                <div className="text-xs text-amber-500 mt-1.5">★ {agent.rating} <span className="text-muted">({agent.reviews.toLocaleString()}件)</span></div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {cities.length > 0 && (
-        <div className="px-4 pt-4 pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
-            候補の都市
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {cities.slice(0, 6).map((city) => (
-              <button
-                key={city.name}
-                onClick={() => setFocusedCity(city)}
-                className="relative overflow-hidden rounded-xl group"
-                style={{ aspectRatio: "247 / 164" }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={city.images[0]}
-                  alt={city.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                <div className="absolute bottom-0 left-0 p-2 text-left">
-                  <div className="text-white text-xs font-bold leading-tight">
-                    {city.flag} {city.name}
-                  </div>
-                </div>
-                {city.images.length > 1 && (
-                  <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                    +{city.images.length - 1}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {schools.length > 0 && (
-        <div className="pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide px-4 pt-4 mb-3">
-            語学学校
-          </p>
-          {/* マップ */}
-          <SchoolMap
-            schools={schools}
-            onSelect={setFocusedSchool}
-            hoveredSchoolId={hoveredSchool?.id}
-          />
-          {/* 学校カードリスト */}
-          <div className="flex flex-col gap-2 px-4 pt-3">
-            {schools.map((school) => (
-              <button
-                key={school.id}
-                onClick={() => setFocusedSchool(school)}
-                onMouseEnter={() => setHoveredSchool(school)}
-                onMouseLeave={() => setHoveredSchool(null)}
-                className={`border rounded-xl p-3 transition-all text-left w-full ${
-                  hoveredSchool?.id === school.id
-                    ? 'bg-primary/5 border-primary/40 shadow-sm'
-                    : 'bg-white border-border hover:border-primary/30 hover:shadow-sm'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-primary truncate">{school.name}</span>
-                      {school.is_partner && (
-                        <span className="text-[10px] bg-primary text-white px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">提携校</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted mt-0.5">{school.city} · {school.type}</div>
-                  </div>
-                  {school.fee_per_week && (
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-semibold text-primary">¥{school.fee_per_week.toLocaleString()}</div>
-                      <div className="text-[10px] text-muted">/週</div>
-                    </div>
-                  )}
-                </div>
-                {school.description && (
-                  <p className="text-xs text-muted mt-1.5 leading-relaxed line-clamp-2">{school.description}</p>
-                )}
-              </button>
             ))}
           </div>
         </div>
