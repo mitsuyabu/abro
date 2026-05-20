@@ -26,13 +26,14 @@ interface Message {
   context?: SidebarContext;
 }
 
-function InlineCityCards({ cities }: { cities: CityItem[] }) {
+function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text: string) => void }) {
   return (
     <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
       {cities.map(city => (
-        <div
+        <button
           key={city.name}
-          className="flex-shrink-0 w-32 rounded-2xl overflow-hidden shadow-sm border border-border/60 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => onSend(`${city.name}での留学・ワーホリについて詳しく教えてください。`)}
+          className="flex-shrink-0 w-32 rounded-2xl overflow-hidden shadow-sm border border-border/60 hover:shadow-md hover:scale-[1.02] transition-all text-left"
         >
           <div className="relative h-20">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -45,19 +46,20 @@ function InlineCityCards({ cities }: { cities: CityItem[] }) {
           <div className="px-2 py-1.5 bg-white">
             <div className="text-[10px] text-muted">{city.country}</div>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
 }
 
-function InlineSchoolCards({ schools }: { schools: SchoolItem[] }) {
+function InlineSchoolCards({ schools, onSend }: { schools: SchoolItem[]; onSend: (text: string) => void }) {
   return (
     <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
       {schools.map(school => (
-        <div
+        <button
           key={school.id}
-          className="flex-shrink-0 w-44 rounded-2xl border border-border bg-white p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+          onClick={() => onSend(`${school.name}（${school.city}）について詳しく教えてください。`)}
+          className="flex-shrink-0 w-44 rounded-2xl border border-border bg-white p-3 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all text-left"
         >
           <div className="flex items-center gap-1.5 mb-1.5">
             <span className="text-base">🎓</span>
@@ -70,7 +72,7 @@ function InlineSchoolCards({ schools }: { schools: SchoolItem[] }) {
           {school.fee_per_week && (
             <div className="text-xs font-semibold text-primary mt-1.5">¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span></div>
           )}
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -271,10 +273,10 @@ export default function ChatPage() {
                     (msg.context.cities.length > 0 || msg.context.schools.length > 0) && (
                       <div className="mt-2 pl-9 sm:pl-11 flex flex-col gap-2">
                         {msg.context.cities.length > 0 && (
-                          <InlineCityCards cities={msg.context.cities} />
+                          <InlineCityCards cities={msg.context.cities} onSend={handleSend} />
                         )}
                         {msg.context.schools.length > 0 && (
-                          <InlineSchoolCards schools={msg.context.schools} />
+                          <InlineSchoolCards schools={msg.context.schools} onSend={handleSend} />
                         )}
                       </div>
                     )
