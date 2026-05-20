@@ -114,9 +114,6 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
     (content.includes('相談') || content.includes('おすすめ') || content.includes('提案') || content.includes('紹介'));
   const lowerContent = content.toLowerCase();
 
-  // 名前で一致する学校（学校名が1回でも出たら表示）
-  const schoolsByName = allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
-
   // 学校トピック × フォーカス都市がある場合のみ都市絞り込み学校を表示
   const mentionsSchoolTopic =
     content.includes('語学学校') || lowerContent.includes('english school') || lowerContent.includes('language school');
@@ -135,6 +132,11 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
   } else {
     targetCityNames = new Set(cities.map(c => c.name));
   }
+
+  // 都市が特定されている場合はその都市の学校のみ（他都市の同名校を拾わないよう制限）
+  const schoolsByName = targetCityNames.size > 0
+    ? allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()) && targetCityNames.has(s.city))
+    : allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
 
   const schoolsByCity = mentionsSchoolTopic && targetCityNames.size > 0
     ? allSchools.filter(s => targetCityNames.has(s.city))
