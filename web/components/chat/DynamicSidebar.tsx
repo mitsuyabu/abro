@@ -352,11 +352,11 @@ export function DynamicSidebar({ context }: Props) {
             <div>
               <h2 className="text-lg font-bold text-primary">{focusedSchool.name}</h2>
               <p className="text-sm text-muted mt-0.5">{focusedSchool.city} · {focusedSchool.type}</p>
-              {focusedSchool.rating && (
+              {focusedSchool.rating != null && (
                 <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-amber-500 text-sm">★ {focusedSchool.rating.toFixed(1)}</span>
-                  {focusedSchool.review_count && (
-                    <span className="text-xs text-muted">({focusedSchool.review_count.toLocaleString()}件のレビュー)</span>
+                  <span className="text-amber-500 text-sm">★ {Number(focusedSchool.rating).toFixed(1)}</span>
+                  {focusedSchool.review_count != null && (
+                    <span className="text-xs text-muted">({Number(focusedSchool.review_count).toLocaleString()}件のレビュー)</span>
                   )}
                 </div>
               )}
@@ -512,8 +512,8 @@ export function DynamicSidebar({ context }: Props) {
                         )}
                       </div>
                       <div className="text-[10px] text-muted">{school.city} · {school.type}</div>
-                      {school.rating && (
-                        <div className="text-[10px] text-amber-500 mt-0.5">★ {school.rating.toFixed(1)} <span className="text-muted">{school.review_count ? `(${school.review_count})` : ''}</span></div>
+                      {school.rating != null && (
+                        <div className="text-[10px] text-amber-500 mt-0.5">★ {Number(school.rating).toFixed(1)} <span className="text-muted">{school.review_count ? `(${Number(school.review_count).toLocaleString()})` : ''}</span></div>
                       )}
                     </div>
                     {school.fee_per_week && (
