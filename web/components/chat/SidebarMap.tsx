@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Tooltip, Popup, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useMemo } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import type { CityItem, SchoolItem } from './DynamicSidebar';
 
 const LOCATION_COORDS: Record<string, [number, number]> = {
@@ -23,6 +23,52 @@ const LOCATION_COORDS: Record<string, [number, number]> = {
   'マルタ':           [35.9375,   14.3754],
 };
 
+function makePinIcon(emoji: string, name: string, dotColor: string, scale = 1) {
+  const fs = Math.round(11 * scale);
+  const py = Math.round(5 * scale);
+  const px = Math.round(10 * scale);
+  const dot = Math.round(8 * scale);
+  const gap = Math.round(5 * scale);
+  return L.divIcon({
+    className: '',
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+    html: `
+      <div style="
+        position:absolute;
+        transform:translate(-50%,-100%);
+        display:flex;flex-direction:column;align-items:center;
+        cursor:pointer;pointer-events:auto;
+      ">
+        <div style="
+          background:white;
+          border-radius:20px;
+          padding:${py}px ${px}px;
+          box-shadow:0 2px 10px rgba(0,0,0,0.22);
+          display:flex;align-items:center;gap:${gap}px;
+          white-space:nowrap;
+          font-size:${fs}px;font-weight:700;
+          font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+          color:#111;
+          border:1.5px solid rgba(0,0,0,0.07);
+          max-width:180px;
+        ">
+          <span style="font-size:${fs + 1}px">${emoji}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;max-width:140px">${name}</span>
+        </div>
+        <div style="
+          width:${dot}px;height:${dot}px;
+          background:${dotColor};
+          border-radius:50%;
+          border:2px solid white;
+          margin-top:3px;
+          box-shadow:0 1px 4px rgba(0,0,0,0.35);
+          flex-shrink:0;
+        "></div>
+      </div>`,
+  });
+}
+
 function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
@@ -30,8 +76,7 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
     if (positions.length === 1) {
       map.setView(positions[0], 13);
     } else {
-      const bounds = L.latLngBounds(positions);
-      map.fitBounds(bounds, { padding: [60, 60] });
+      map.fitBounds(L.latLngBounds(positions), { padding: [70, 70] });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(positions)]);
@@ -48,8 +93,8 @@ function FlyToSchool({
   const map = useMap();
   useEffect(() => {
     if (!hoveredSchoolId) return;
-    const target = entries.find(e => e.id === hoveredSchoolId);
-    if (target) map.flyTo(target.pos, 14, { duration: 0.5 });
+    const t = entries.find(e => e.id === hoveredSchoolId);
+    if (t) map.flyTo(t.pos, 14, { duration: 0.4 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredSchoolId]);
   return null;
@@ -63,33 +108,46 @@ interface Props {
   hoveredSchoolId?: string;
 }
 
-export default function SidebarMap({
-  cities,
-  schools,
-  onSelectCity,
-  onSelectSchool,
-  hoveredSchoolId,
-}: Props) {
-  const cityEntries = cities
-    .map(city => ({ city, pos: LOCATION_COORDS[city.name] }))
-    .filter((e): e is { city: CityItem; pos: [number, number] } => !!e.pos);
+export default function SidebarMap({ cities, schools, onSelectCity, onSelectSchool, hoveredSchoolId }: Props) {
+  const cityEntries = useMemo(() =>
+    cities
+      .map(city => ({ city, pos: LOCATION_COORDS[city.name] }))
+      .filter((e): e is { city: CityItem; pos: [number, number] } => !!e.pos),
+    [cities]
+  );
 
-  const schoolEntries = schools
-    .map((school, i) => {
-      const base = LOCATION_COORDS[school.city];
-      if (!base) return null;
-      const offset = schools.slice(0, i).filter(s => s.city === school.city).length;
-      return {
-        school,
-        pos: [base[0] + offset * 0.009, base[1] + offset * 0.009] as [number, number],
-      };
-    })
-    .filter((e): e is { school: SchoolItem; pos: [number, number] } => !!e);
+  const schoolEntries = useMemo(() =>
+    schools
+      .map((school, i) => {
+        const base = LOCATION_COORDS[school.city];
+        if (!base) return null;
+        const offset = schools.slice(0, i).filter(s => s.city === school.city).length;
+        return { school, pos: [base[0] + offset * 0.009, base[1] + offset * 0.009] as [number, number] };
+      })
+      .filter((e): e is { school: SchoolItem; pos: [number, number] } => !!e),
+    [schools]
+  );
 
-  const allPositions: [number, number][] = [
-    ...cityEntries.map(e => e.pos),
-    ...schoolEntries.map(e => e.pos),
-  ];
+  const allPositions = useMemo(
+    () => [...cityEntries.map(e => e.pos), ...schoolEntries.map(e => e.pos)],
+    [cityEntries, schoolEntries]
+  );
+
+  const cityIcons = useMemo(
+    () => Object.fromEntries(cityEntries.map(({ city }) => [city.name, makePinIcon(city.flag, city.name, '#2563EB')])),
+    [cityEntries]
+  );
+
+  const schoolIcons = useMemo(
+    () => Object.fromEntries(
+      schoolEntries.map(({ school }) => [
+        school.id,
+        makePinIcon('🎓', school.name, school.id === hoveredSchoolId ? '#FF5A00' : '#111', school.id === hoveredSchoolId ? 1.15 : 1),
+      ])
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [schoolEntries, hoveredSchoolId]
+  );
 
   if (allPositions.length === 0) return null;
 
@@ -114,20 +172,13 @@ export default function SidebarMap({
         hoveredSchoolId={hoveredSchoolId}
       />
 
-      {/* 都市ピン */}
       {cityEntries.map(({ city, pos }) => (
-        <CircleMarker
+        <Marker
           key={city.name}
-          center={pos}
-          radius={13}
-          pathOptions={{ color: 'white', fillColor: '#2563EB', fillOpacity: 0.92, weight: 2.5 }}
+          position={pos}
+          icon={cityIcons[city.name]}
           eventHandlers={{ click: () => onSelectCity(city) }}
         >
-          <Tooltip permanent direction="top" offset={[0, -16]} className="map-label-city">
-            <span style={{ fontWeight: 700, fontSize: '11px', whiteSpace: 'nowrap' }}>
-              {city.flag} {city.name}
-            </span>
-          </Tooltip>
           <Popup>
             <div style={{ minWidth: '140px', fontFamily: 'sans-serif' }}>
               <div style={{ fontWeight: 700, fontSize: '13px' }}>{city.flag} {city.name}</div>
@@ -136,52 +187,37 @@ export default function SidebarMap({
                 onClick={() => onSelectCity(city)}
                 style={{ marginTop: '8px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', width: '100%' }}
               >
-                都市の詳細を見る
+                都市の詳細を見る →
               </button>
             </div>
           </Popup>
-        </CircleMarker>
+        </Marker>
       ))}
 
-      {/* 語学学校ピン */}
-      {schoolEntries.map(({ school, pos }) => {
-        const isHovered = school.id === hoveredSchoolId;
-        return (
-          <CircleMarker
-            key={school.id}
-            center={pos}
-            radius={isHovered ? 13 : 8}
-            pathOptions={{
-              color: 'white',
-              fillColor: isHovered ? '#FF5A00' : '#1A1A1A',
-              fillOpacity: 1,
-              weight: isHovered ? 3 : 2,
-            }}
-            eventHandlers={{ click: () => onSelectSchool(school) }}
-          >
-            <Tooltip permanent direction="right" offset={[10, 0]} className="map-label-school">
-              <span style={{ fontSize: '10px', whiteSpace: 'nowrap' }}>🎓 {school.name}</span>
-            </Tooltip>
-            <Popup>
-              <div style={{ minWidth: '160px', fontFamily: 'sans-serif' }}>
-                <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{school.name}</div>
-                <div style={{ color: '#888', fontSize: '11px' }}>{school.city} · {school.type}</div>
-                {school.fee_per_week && (
-                  <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>
-                    ¥{school.fee_per_week.toLocaleString()}/週
-                  </div>
-                )}
-                <button
-                  onClick={() => onSelectSchool(school)}
-                  style={{ marginTop: '8px', background: '#1A1A1A', color: 'white', border: 'none', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', width: '100%' }}
-                >
-                  詳細を見る
-                </button>
-              </div>
-            </Popup>
-          </CircleMarker>
-        );
-      })}
+      {schoolEntries.map(({ school, pos }) => (
+        <Marker
+          key={school.id}
+          position={pos}
+          icon={schoolIcons[school.id]}
+          eventHandlers={{ click: () => onSelectSchool(school) }}
+        >
+          <Popup>
+            <div style={{ minWidth: '160px', fontFamily: 'sans-serif' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '2px' }}>{school.name}</div>
+              <div style={{ color: '#888', fontSize: '11px' }}>{school.city} · {school.type}</div>
+              {school.fee_per_week && (
+                <div style={{ fontSize: '12px', marginTop: '4px', fontWeight: 600 }}>¥{school.fee_per_week.toLocaleString()}/週</div>
+              )}
+              <button
+                onClick={() => onSelectSchool(school)}
+                style={{ marginTop: '8px', background: '#111', color: 'white', border: 'none', borderRadius: '8px', padding: '5px 10px', fontSize: '11px', cursor: 'pointer', width: '100%' }}
+              >
+                詳細を見る →
+              </button>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
 }
