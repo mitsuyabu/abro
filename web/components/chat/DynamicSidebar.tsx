@@ -46,6 +46,8 @@ export interface SchoolItem {
   google_place_id?: string | null;
   google_reviews?: GoogleReview[] | null;
   google_photos?: string[] | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface SidebarContext {

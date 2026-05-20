@@ -21,6 +21,7 @@ interface PlaceResult {
   id: string;
   displayName?: { text: string };
   formattedAddress?: string;
+  location?: { latitude: number; longitude: number };
   rating?: number;
   userRatingCount?: number;
   websiteUri?: string;
@@ -45,6 +46,7 @@ async function searchPlaces(query: string, apiKey: string): Promise<PlaceResult[
         'places.id',
         'places.displayName',
         'places.formattedAddress',
+        'places.location',
         'places.rating',
         'places.userRatingCount',
         'places.websiteUri',
@@ -121,6 +123,8 @@ export async function POST(req: NextRequest) {
           review_count: place.userRatingCount ?? 0,
           google_reviews: reviews,
           google_photos: photos,
+          latitude: place.location?.latitude ?? null,
+          longitude: place.location?.longitude ?? null,
         };
 
         const { error } = await supabase

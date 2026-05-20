@@ -118,10 +118,15 @@ export default function SidebarMap({ cities, schools, onSelectCity, onSelectScho
 
   const schoolEntries = useMemo(() =>
     schools
-      .map((school, i) => {
+      .map((school) => {
+        // 実座標があればそれを使用
+        if (school.latitude != null && school.longitude != null) {
+          return { school, pos: [school.latitude, school.longitude] as [number, number] };
+        }
+        // フォールバック：都市中心からオフセット
         const base = LOCATION_COORDS[school.city];
         if (!base) return null;
-        const offset = schools.slice(0, i).filter(s => s.city === school.city).length;
+        const offset = schools.filter(s => s.city === school.city && s.id < school.id).length;
         return { school, pos: [base[0] + offset * 0.009, base[1] + offset * 0.009] as [number, number] };
       })
       .filter((e): e is { school: SchoolItem; pos: [number, number] } => !!e),
