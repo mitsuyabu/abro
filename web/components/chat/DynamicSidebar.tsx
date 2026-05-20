@@ -22,6 +22,14 @@ export interface CityItem {
   mapQuery: string;
 }
 
+export interface GoogleReview {
+  author: string;
+  author_photo: string | null;
+  rating: number;
+  text: string;
+  time: string;
+}
+
 export interface SchoolItem {
   id: string;
   name: string;
@@ -33,6 +41,11 @@ export interface SchoolItem {
   website: string | null;
   is_partner: boolean;
   images: string[];
+  rating?: number | null;
+  review_count?: number | null;
+  google_place_id?: string | null;
+  google_reviews?: GoogleReview[] | null;
+  google_photos?: string[] | null;
 }
 
 export interface SidebarContext {
@@ -308,6 +321,8 @@ export function DynamicSidebar({ context }: Props) {
   if (!hasContext) return <RecommendationPanel />;
 
   if (focusedSchool) {
+    const photos = focusedSchool.google_photos?.length ? focusedSchool.google_photos : focusedSchool.images;
+    const reviews = focusedSchool.google_reviews ?? [];
     return (
       <div className="flex flex-col h-full overflow-y-auto">
         <button
@@ -316,11 +331,35 @@ export function DynamicSidebar({ context }: Props) {
         >
           ← 戻る
         </button>
+
+        {/* Photos */}
+        {photos.length > 0 && (
+          <div className="flex gap-1 px-4 pb-1 overflow-x-auto scrollbar-hide flex-shrink-0">
+            {photos.map((url, i) => (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                key={i}
+                src={url}
+                alt={`${focusedSchool.name} photo ${i + 1}`}
+                className="h-28 w-40 object-cover rounded-xl flex-shrink-0"
+              />
+            ))}
+          </div>
+        )}
+
         <div className="p-4 flex flex-col gap-4">
           <div className="flex items-start justify-between gap-2">
             <div>
               <h2 className="text-lg font-bold text-primary">{focusedSchool.name}</h2>
               <p className="text-sm text-muted mt-0.5">{focusedSchool.city} · {focusedSchool.type}</p>
+              {focusedSchool.rating && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-amber-500 text-sm">★ {focusedSchool.rating.toFixed(1)}</span>
+                  {focusedSchool.review_count && (
+                    <span className="text-xs text-muted">({focusedSchool.review_count.toLocaleString()}件のレビュー)</span>
+                  )}
+                </div>
+              )}
             </div>
             {focusedSchool.is_partner && (
               <span className="text-[10px] bg-primary text-white px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0">提携校</span>
@@ -336,6 +375,32 @@ export function DynamicSidebar({ context }: Props) {
 
           {focusedSchool.description && (
             <p className="text-sm text-primary leading-relaxed">{focusedSchool.description}</p>
+          )}
+
+          {reviews.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Googleレビュー</p>
+              <div className="flex flex-col gap-3">
+                {reviews.slice(0, 3).map((r, i) => (
+                  <div key={i} className="bg-background rounded-xl p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      {r.author_photo ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={r.author_photo} alt={r.author} className="w-6 h-6 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">{r.author[0]}</div>
+                      )}
+                      <div>
+                        <span className="text-xs font-semibold text-primary">{r.author}</span>
+                        <span className="text-[10px] text-muted ml-1.5">{r.time}</span>
+                      </div>
+                      <span className="ml-auto text-amber-500 text-xs">{'★'.repeat(r.rating)}</span>
+                    </div>
+                    {r.text && <p className="text-xs text-primary leading-relaxed line-clamp-4">{r.text}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {focusedSchool.website && (
@@ -447,6 +512,9 @@ export function DynamicSidebar({ context }: Props) {
                         )}
                       </div>
                       <div className="text-[10px] text-muted">{school.city} · {school.type}</div>
+                      {school.rating && (
+                        <div className="text-[10px] text-amber-500 mt-0.5">★ {school.rating.toFixed(1)} <span className="text-muted">{school.review_count ? `(${school.review_count})` : ''}</span></div>
+                      )}
                     </div>
                     {school.fee_per_week && (
                       <div className="text-right flex-shrink-0">
