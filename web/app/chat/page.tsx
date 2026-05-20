@@ -2,8 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
+
+const SidebarMapMobile = dynamic(() => import('@/components/chat/SidebarMap'), { ssr: false });
 
 const ACTION_CHIPS = [
   { id: 'plan',  emoji: '✨', label: 'プランを作る',    prompt: 'ワーホリ・留学のプランを一緒に考えたいです。' },
@@ -148,6 +151,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [showMapView, setShowMapView] = useState(false);
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -232,15 +236,6 @@ export default function ChatPage() {
           <span className="text-sm font-semibold text-primary">新しいチャット</span>
           <span className="text-muted text-xs">▾</span>
           <span className="ml-auto text-xs font-medium text-primary/60 italic tracking-wide hidden sm:block">留学を、もっと自分らしく</span>
-          {/* モバイル・タブレット：右パネルトグルボタン */}
-          {hasRightContent && (
-            <button
-              onClick={() => setShowRightPanel(v => !v)}
-              className="lg:hidden ml-2 text-xs font-medium text-primary border border-border rounded-full px-3 py-1 hover:bg-gray-50 transition-colors"
-            >
-              {sidebarLabel}
-            </button>
-          )}
         </div>
 
         {/* メッセージエリア */}
@@ -341,6 +336,18 @@ export default function ChatPage() {
         {!isEmpty && (
           <div className="border-t border-border bg-white px-4 sm:px-5 py-3 sm:py-4">
             <div className="max-w-2xl mx-auto">
+              {/* モバイル：Mapボタン */}
+              {hasRightContent && (
+                <div className="lg:hidden flex justify-center mb-3">
+                  <button
+                    onClick={() => setShowMapView(true)}
+                    className="flex items-center gap-2 bg-primary text-white rounded-full px-5 py-2 text-sm font-semibold shadow-md hover:opacity-90 transition-opacity"
+                  >
+                    <span>🗺</span>
+                    <span>Map</span>
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2 overflow-x-auto pb-2 mb-2 sm:mb-3 scrollbar-hide">
                 {suggestions.map(s => (
                   <button
@@ -371,30 +378,34 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* モバイル・タブレット：スライドオーバーパネル */}
-      {showRightPanel && (
-        <>
-          {/* 背景オーバーレイ */}
-          <div
-            className="lg:hidden fixed inset-0 bg-black/30 z-40"
-            onClick={() => setShowRightPanel(false)}
-          />
-          {/* パネル本体 */}
-          <div className="lg:hidden fixed right-0 top-0 h-full w-80 sm:w-96 bg-background border-l border-border flex flex-col z-50 shadow-xl">
-            <div className="h-12 border-b border-border flex items-center px-5 bg-white flex-shrink-0">
-              <span className="text-xs font-semibold text-muted uppercase tracking-wide">{sidebarLabel}</span>
-              <button
-                onClick={() => setShowRightPanel(false)}
-                className="ml-auto text-muted hover:text-primary text-xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <DynamicSidebar context={sidebarContext} />
-            </div>
+      {/* モバイル：全画面マップオーバーレイ */}
+      {showMapView && (
+        <div className="lg:hidden fixed inset-0 z-50 flex flex-col">
+          {/* マップ本体 */}
+          <div className="flex-1 min-h-0">
+            <SidebarMapMobile
+              cities={sidebarContext.cities}
+              schools={sidebarContext.schools}
+              onSelectCity={(city) => {
+                setShowMapView(false);
+                handleSend(`${city.name}での留学・ワーホリについて詳しく教えてください。`);
+              }}
+              onSelectSchool={(school) => {
+                setShowMapView(false);
+                handleSend(`${school.name}（${school.city}）について詳しく教えてください。`);
+              }}
+            />
           </div>
-        </>
+          {/* Back to chat ボタン */}
+          <div className="flex-shrink-0 bg-black/90 backdrop-blur-sm px-6 py-5 flex justify-center">
+            <button
+              onClick={() => setShowMapView(false)}
+              className="text-white text-sm font-semibold tracking-wide"
+            >
+              ← Back to chat
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
