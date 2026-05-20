@@ -81,8 +81,32 @@ function InlineSchoolCards({ schools, onSend }: { schools: SchoolItem[]; onSend:
   );
 }
 
-function detectSidebarContext(content: string, allSchools: SchoolItem[]): SidebarContext {
-  const cities = CITY_DATA.filter(c => content.includes(c.name));
+// 推薦・フォーカスを示すパターン
+const CITY_FOCUS_PATTERNS = [
+  'がおすすめ', 'をおすすめ', 'をご提案', 'をご紹介', 'が候補', 'を候補',
+  'での留学', 'でのワーホリ', 'での生活', 'に行く', 'に滞在', 'を選ぶ',
+  'に絞', 'を中心', 'を第一候補', 'が有力', 'に注目', 'がぴったり',
+];
+
+function cityIsFocused(cityName: string, content: string): boolean {
+  const count = (content.match(new RegExp(cityName, 'g')) || []).length;
+  if (count >= 2) return true;
+  // 1回だけでも推薦パターンの直後・直前にある場合
+  return CITY_FOCUS_PATTERNS.some(pat => {
+    const idx = content.indexOf(pat);
+    if (idx === -1) return false;
+    // パターンの前後50文字以内に都市名があるか
+    const window = content.slice(Math.max(0, idx - 50), idx + 50);
+    return window.includes(cityName);
+  });
+}
+
+function detectSidebarContext(content: string, userMessage: string, allSchools: SchoolItem[]): SidebarContext {
+  // 都市カードはユーザーが言及 OR AIが2回以上言及 OR 推薦パターン付きの場合のみ表示
+  const cities = CITY_DATA.filter(c =>
+    userMessage.includes(c.name) || cityIsFocused(c.name, content)
+  );
+
   const cityCountryNames = new Set(cities.map(c => c.country));
   const countries = COUNTRY_DATA.filter(c => content.includes(c.name) && !cityCountryNames.has(c.name));
   const showAgents =
@@ -90,23 +114,21 @@ function detectSidebarContext(content: string, allSchools: SchoolItem[]): Sideba
     (content.includes('相談') || content.includes('おすすめ') || content.includes('提案') || content.includes('紹介'));
   const lowerContent = content.toLowerCase();
 
-  // 名前で一致する学校
+  // 名前で一致する学校（学校名が1回でも出たら表示）
   const schoolsByName = allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
 
-  // 学校トピックが話されている場合、都市の言及頻度を計算してフォーカス都市を決定
+  // 学校トピック × フォーカス都市がある場合のみ都市絞り込み学校を表示
   const mentionsSchoolTopic =
-    content.includes('語学学校') || content.includes('学校') || lowerContent.includes('school');
+    content.includes('語学学校') || lowerContent.includes('english school') || lowerContent.includes('language school');
 
   let targetCityNames: Set<string>;
   if (cities.length > 1) {
-    // 複数都市が検出された場合：最も多く言及された都市を優先
     const cityCounts = cities.map(c => ({
       name: c.name,
       count: (content.match(new RegExp(c.name, 'g')) || []).length,
     }));
     const maxCount = Math.max(...cityCounts.map(c => c.count));
     const dominant = cityCounts.filter(c => c.count >= maxCount * 0.8);
-    // 1都市が支配的ならその都市のみ、そうでなければ全都市
     targetCityNames = new Set(
       dominant.length === 1 ? [dominant[0].name] : cities.map(c => c.name)
     );
@@ -118,7 +140,6 @@ function detectSidebarContext(content: string, allSchools: SchoolItem[]): Sideba
     ? allSchools.filter(s => targetCityNames.has(s.city))
     : [];
 
-  // 重複排除してマージ
   const merged = new Map([...schoolsByName, ...schoolsByCity].map(s => [s.id, s]));
   const schools = [...merged.values()];
 
@@ -199,7 +220,7 @@ export default function ChatPage() {
         setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: m.content + chunk } : m));
       }
 
-      const ctx = detectSidebarContext(fullContent, allSchools);
+      const ctx = detectSidebarContext(fullContent, text, allSchools);
       setSidebarContext(ctx);
       setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx } : m));
     } catch {
