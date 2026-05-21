@@ -15,7 +15,8 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
-    WHERE tablename = 'users' AND policyname = 'Users can insert own record'
+    WHERE schemaname = 'public' AND tablename = 'users'
+      AND policyname = 'Users can insert own record'
   ) THEN
     EXECUTE $p$
       CREATE POLICY "Users can insert own record"
