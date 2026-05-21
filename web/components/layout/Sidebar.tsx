@@ -79,11 +79,11 @@ export function Sidebar() {
           })}
 
           {/* 作成ボタン */}
-          <div className="mt-3 flex justify-center lg:justify-start">
+          <div className="mt-3 flex justify-center">
             <Link
               href="/creator"
               title="作成する"
-              className="flex items-center justify-center w-10 h-10 rounded-xl border-2 border-gray-300 text-gray-500 text-xl hover:border-primary hover:text-primary transition-colors"
+              className="flex items-center justify-center w-10 h-10 rounded-xl border-2 border-black text-black text-xl hover:opacity-60 transition-opacity"
             >
               +
             </Link>
