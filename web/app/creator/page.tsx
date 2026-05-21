@@ -78,7 +78,7 @@ export default function CreatorPage() {
                   key={i}
                   src={url}
                   alt=""
-                  className="flex-shrink-0 w-52 h-36 object-cover rounded-2xl"
+                  className="flex-shrink-0 w-40 aspect-[304/347] object-cover rounded-2xl"
                 />
               ))}
             </div>
