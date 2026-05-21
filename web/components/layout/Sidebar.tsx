@@ -79,20 +79,13 @@ export function Sidebar() {
           })}
 
           {/* 作成ボタン */}
-          <div className="mt-3">
-            <Link
-              href="/creator"
-              className="hidden lg:flex w-full items-center justify-center gap-2 bg-primary text-white text-sm font-semibold py-2.5 rounded-full hover:opacity-80 transition-opacity"
-            >
-              <span className="text-base leading-none">＋</span>
-              <span>作成する</span>
-            </Link>
+          <div className="mt-3 flex justify-center lg:justify-start">
             <Link
               href="/creator"
               title="作成する"
-              className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white text-lg hover:opacity-80 transition-opacity mx-auto"
+              className="flex items-center justify-center w-10 h-10 rounded-xl border-2 border-gray-300 text-gray-500 text-xl hover:border-primary hover:text-primary transition-colors"
             >
-              ＋
+              +
             </Link>
           </div>
         </nav>
