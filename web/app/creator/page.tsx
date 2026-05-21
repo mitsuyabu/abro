@@ -19,6 +19,16 @@ interface GuideConfig {
   template: GuideTemplate;
 }
 
+interface GuideEntry {
+  id: string;
+  title: string;
+  count: number;
+  countUnit: string;
+  status: '公開中' | '下書き' | '非公開';
+  statusColor: string;
+  image: string;
+}
+
 // ─── Hub data ─────────────────────────────────────────────────
 const INSPIRATION_PHOTOS = [
   'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=400&q=80',
@@ -29,15 +39,15 @@ const INSPIRATION_PHOTOS = [
   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80',
 ];
 
-const MY_GUIDES = [
+const INITIAL_GUIDES: GuideEntry[] = [
   { id: '1', title: 'シドニーワーホリ完全ガイド', count: 24, countUnit: 'スポット', status: '公開中', statusColor: 'bg-green-100 text-green-700', image: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=400&q=80' },
 ];
 
 const DUMMY_EARNINGS = [
-  { id: '1', source: 'affiliate',      label: 'Skyscanner アフィリエイト',          amount: 3200, date: '2025-05-10', status: 'paid' },
-  { id: '2', source: 'plan_sale',      label: 'プラン販売 — シドニー完全ガイド',      amount: 1500, date: '2025-05-08', status: 'paid' },
-  { id: '3', source: 'affiliate',      label: 'World Nomads アフィリエイト',          amount: 2800, date: '2025-05-06', status: 'pending' },
-  { id: '4', source: 'agent_kickback', label: 'エージェント紹介料',                   amount: 5000, date: '2025-05-01', status: 'paid' },
+  { id: '1', source: 'affiliate',      label: 'Skyscanner アフィリエイト',      amount: 3200, date: '2025-05-10', status: 'paid' },
+  { id: '2', source: 'plan_sale',      label: 'プラン販売 — シドニー完全ガイド', amount: 1500, date: '2025-05-08', status: 'paid' },
+  { id: '3', source: 'affiliate',      label: 'World Nomads アフィリエイト',     amount: 2800, date: '2025-05-06', status: 'pending' },
+  { id: '4', source: 'agent_kickback', label: 'エージェント紹介料',              amount: 5000, date: '2025-05-01', status: 'paid' },
 ];
 
 const SOURCE_EMOJI: Record<string, string> = { affiliate: '🔗', plan_sale: '📋', agent_kickback: '🤝' };
@@ -48,21 +58,31 @@ const STATUS_STYLE: Record<string, { label: string; color: string }> = {
 
 // ─── Wizard data ──────────────────────────────────────────────
 const GUIDE_CATEGORIES: { id: GuideCategory; icon: string; title: string; desc: string }[] = [
-  { id: '学校', icon: '🏫', title: '学校',  desc: '語学学校・大学・コースを紹介する' },
-  { id: '店舗', icon: '🏪', title: '店舗',  desc: 'カフェ・レストラン・お店を紹介する' },
-  { id: '場所', icon: '📍', title: '場所',  desc: '都市・観光スポットのガイドを作る' },
-  { id: '体験', icon: '✨', title: '体験',  desc: 'アクティビティ・体験談をシェアする' },
+  { id: '学校', icon: '🏫', title: '学校', desc: '語学学校・大学・コースを紹介する' },
+  { id: '店舗', icon: '🏪', title: '店舗', desc: 'カフェ・レストラン・お店を紹介する' },
+  { id: '場所', icon: '📍', title: '場所', desc: '都市・観光スポットのガイドを作る' },
+  { id: '体験', icon: '✨', title: '体験', desc: 'アクティビティ・体験談をシェアする' },
 ];
 
 const COVER_IMAGES: Record<string, string> = {
-  'シドニー':     'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1200&q=80',
-  'メルボルン':   'https://images.unsplash.com/photo-1545044846-351ba102b6d5?w=1200&q=80',
-  'バンクーバー': 'https://images.unsplash.com/photo-1560814304-4f05b62af116?w=1200&q=80',
-  'ロンドン':     'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80',
-  'トロント':     'https://images.unsplash.com/photo-1517090504586-fde19ea6066f?w=1200&q=80',
-  'オークランド': 'https://images.unsplash.com/photo-1507699622108-4be3abd695ad?w=1200&q=80',
+  'シドニー':         'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1200&q=80',
+  'メルボルン':       'https://images.unsplash.com/photo-1545044846-351ba102b6d5?w=1200&q=80',
+  'バンクーバー':     'https://images.unsplash.com/photo-1560814304-4f05b62af116?w=1200&q=80',
+  'ロンドン':         'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80',
+  'トロント':         'https://images.unsplash.com/photo-1517090504586-fde19ea6066f?w=1200&q=80',
+  'オークランド':     'https://images.unsplash.com/photo-1507699622108-4be3abd695ad?w=1200&q=80',
   'ゴールドコースト': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80',
-  'セブ':         'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?w=1200&q=80',
+  'セブ':             'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?w=1200&q=80',
+};
+
+const COUNT_UNIT: Record<GuideCategory, string> = {
+  '学校': '学校', '店舗': '店舗', '場所': 'スポット', '体験': '体験',
+};
+
+const STATUS_COLOR: Record<GuideEntry['status'], string> = {
+  '公開中': 'bg-green-100 text-green-700',
+  '下書き': 'bg-gray-100 text-gray-600',
+  '非公開': 'bg-blue-100 text-blue-700',
 };
 
 function getCoverImage(location: string): string {
@@ -72,10 +92,44 @@ function getCoverImage(location: string): string {
   return 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1200&q=80';
 }
 
+function makeGuideEntry(config: GuideConfig, status: GuideEntry['status']): GuideEntry {
+  return {
+    id: Date.now().toString(),
+    title: config.title,
+    count: 0,
+    countUnit: COUNT_UNIT[config.category ?? '場所'],
+    status,
+    statusColor: STATUS_COLOR[status],
+    image: getCoverImage(config.location),
+  };
+}
+
 // ─── Main page ────────────────────────────────────────────────
 export default function CreatorPage() {
   const [activeTab, setActiveTab]   = useState<HubTab>('hub');
   const [showWizard, setShowWizard] = useState(false);
+  const [myGuides, setMyGuides]     = useState<GuideEntry[]>(INITIAL_GUIDES);
+  const [toast, setToast]           = useState<string | null>(null);
+
+  const fireToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handlePublish = (config: GuideConfig) => {
+    setMyGuides(prev => [makeGuideEntry(config, '公開中'), ...prev]);
+    setShowWizard(false);
+    setActiveTab('hub');
+    fireToast('ガイドを公開しました！');
+  };
+
+  const handleSaveDraft = (config: GuideConfig) => {
+    if (!config.title.trim()) { setShowWizard(false); return; }
+    setMyGuides(prev => [makeGuideEntry(config, '下書き'), ...prev]);
+    setShowWizard(false);
+    setActiveTab('hub');
+    fireToast('下書きとして保存しました');
+  };
 
   const totalPaid    = DUMMY_EARNINGS.filter(e => e.status === 'paid').reduce((s, e) => s + e.amount, 0);
   const totalPending = DUMMY_EARNINGS.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0);
@@ -129,11 +183,11 @@ export default function CreatorPage() {
               </div>
 
               {/* 自分のガイド */}
-              {MY_GUIDES.length > 0 && (
+              {myGuides.length > 0 && (
                 <div className="px-6 pb-8 max-w-3xl">
                   <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-4">あなたのガイド</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {MY_GUIDES.map(guide => (
+                    {myGuides.map(guide => (
                       <div key={guide.id} className="border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
                         <div className="relative h-28 bg-gray-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -169,16 +223,16 @@ export default function CreatorPage() {
                 </div>
                 <div className="bg-white border border-border rounded-2xl p-5">
                   <p className="text-xs text-muted mb-2">コンテンツ</p>
-                  <p className="text-2xl font-bold text-primary">{MY_GUIDES.length}</p>
+                  <p className="text-2xl font-bold text-primary">{myGuides.filter(g => g.status === '公開中').length}</p>
                   <p className="text-xs text-muted mt-1">公開中のガイド</p>
                 </div>
               </div>
               <div className="bg-white border border-border rounded-2xl p-5 mb-6">
                 <h3 className="text-sm font-semibold text-primary mb-4">収益源の内訳</h3>
                 {[
-                  { emoji: '🤝', label: '紹介料', amount: 5000, pct: 40 },
+                  { emoji: '🤝', label: '紹介料',       amount: 5000, pct: 40 },
                   { emoji: '🔗', label: 'アフィリエイト', amount: 6000, pct: 48 },
-                  { emoji: '📋', label: 'プラン販売', amount: 1500, pct: 12 },
+                  { emoji: '📋', label: 'プラン販売',    amount: 1500, pct: 12 },
                 ].map(item => (
                   <div key={item.label} className="mb-3">
                     <div className="flex items-center justify-between mb-1">
@@ -217,14 +271,35 @@ export default function CreatorPage() {
         </div>
       </div>
 
+      {/* トースト通知 */}
+      {toast && (
+        <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 bg-black text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-lg z-[60] whitespace-nowrap">
+          {toast}
+        </div>
+      )}
+
       {/* ウィザードオーバーレイ */}
-      {showWizard && <GuideWizard onClose={() => setShowWizard(false)} />}
+      {showWizard && (
+        <GuideWizard
+          onClose={() => setShowWizard(false)}
+          onPublish={handlePublish}
+          onSaveDraft={handleSaveDraft}
+        />
+      )}
     </>
   );
 }
 
 // ─── Wizard ───────────────────────────────────────────────────
-function GuideWizard({ onClose }: { onClose: () => void }) {
+function GuideWizard({
+  onClose,
+  onPublish,
+  onSaveDraft,
+}: {
+  onClose: () => void;
+  onPublish: (config: GuideConfig) => void;
+  onSaveDraft: (config: GuideConfig) => void;
+}) {
   const [step, setStep] = useState<WizardStep>(0);
   const [config, setConfig] = useState<GuideConfig>({
     category: null, layout: null, title: '', location: '', template: 'blank',
@@ -240,7 +315,14 @@ function GuideWizard({ onClose }: { onClose: () => void }) {
   const back = () => { if (step === 0) onClose(); else setStep(s => (s - 1) as WizardStep); };
 
   if (step === 3) {
-    return <GuideEditor config={config} onBack={() => setStep(2)} onClose={onClose} />;
+    return (
+      <GuideEditor
+        config={config}
+        onBack={() => setStep(2)}
+        onPublish={onPublish}
+        onSaveDraft={onSaveDraft}
+      />
+    );
   }
 
   return (
@@ -440,7 +522,17 @@ function StepConfigure({ config, setConfig }: { config: GuideConfig; setConfig: 
 }
 
 // ─── Step 4: エディター ────────────────────────────────────────
-function GuideEditor({ config, onBack, onClose }: { config: GuideConfig; onBack: () => void; onClose: () => void }) {
+function GuideEditor({
+  config,
+  onBack,
+  onPublish,
+  onSaveDraft,
+}: {
+  config: GuideConfig;
+  onBack: () => void;
+  onPublish: (config: GuideConfig) => void;
+  onSaveDraft: (config: GuideConfig) => void;
+}) {
   const coverImage = getCoverImage(config.location);
   const [activeTab, setActiveTab] = useState<'overview' | 'map'>('overview');
   const [summary, setSummary] = useState('');
@@ -454,10 +546,14 @@ function GuideEditor({ config, onBack, onClose }: { config: GuideConfig; onBack:
         </button>
         <span className="text-sm font-semibold flex-1 truncate">{config.title || '無題のガイド'}</span>
         <span className="text-xs bg-gray-100 text-muted px-2.5 py-1 rounded-full flex-shrink-0">下書き</span>
-        <span className="text-xs text-muted flex-shrink-0 hidden sm:block">更新: たった今</span>
-        <button className="text-xs font-medium border border-border rounded-full px-3 py-1.5 hover:border-primary/40 transition-colors flex-shrink-0">プレビュー</button>
         <button
-          onClick={onClose}
+          onClick={() => onSaveDraft(config)}
+          className="text-xs font-medium border border-border rounded-full px-3 py-1.5 hover:border-primary/40 transition-colors flex-shrink-0"
+        >
+          下書き保存
+        </button>
+        <button
+          onClick={() => onPublish(config)}
           className="text-xs font-semibold bg-black text-white rounded-full px-4 py-1.5 hover:opacity-80 transition-opacity flex-shrink-0"
         >
           公開する
