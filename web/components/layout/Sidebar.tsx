@@ -7,7 +7,7 @@ import { createClient } from '@/utils/supabase/client';
 import type { User } from '@supabase/supabase-js';
 
 const NAV_ITEMS = [
-  { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット', badge: 2 },
+  { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット' },
   { href: '/plans',       icon: '/icon-plan.png',        label: 'プラン' },
   { href: '/explore',     icon: '/icon-explore.png',     label: '探す' },
   { href: '/saved',       icon: '/icon-saved.png',       label: '保存済み' },
