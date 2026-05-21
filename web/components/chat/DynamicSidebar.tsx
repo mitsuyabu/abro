@@ -253,6 +253,8 @@ const AVATAR_STYLE: React.CSSProperties = {};
 
 interface Props {
   context: SidebarContext;
+  focusedSchool?: SchoolItem | null;
+  onFocusedSchoolChange?: (school: SchoolItem | null) => void;
 }
 
 function ImageGallery({
@@ -313,50 +315,70 @@ function ImageGallery({
   );
 }
 
+function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
+  return (
+    <span className="text-amber-400">
+      {Array.from({ length: max }).map((_, i) => (
+        <span key={i} style={{ opacity: i < Math.round(rating) ? 1 : 0.25 }}>★</span>
+      ))}
+    </span>
+  );
+}
+
 function SchoolDetailPanel({ school, onBack }: { school: SchoolItem; onBack: () => void }) {
   const [tab, setTab] = useState<'overview' | 'reviews' | 'location'>('overview');
-  const photos = school.google_photos?.length ? school.google_photos : school.images;
+  const photos = school.google_photos?.length ? school.google_photos : (school.images ?? []);
   const reviews = school.google_reviews ?? [];
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ヘッダー */}
-      <div className="flex-shrink-0 border-b border-border">
+      {/* スティッキーヘッダー */}
+      <div className="flex-shrink-0 bg-white border-b border-border">
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
-          <button onClick={onBack} className="text-sm text-muted hover:text-primary transition-colors">← 戻る</button>
+          <button onClick={onBack} className="text-sm text-muted hover:text-primary transition-colors flex items-center gap-1">
+            ← 戻る
+          </button>
           {school.website && (
             <a href={school.website} target="_blank" rel="noopener noreferrer"
-              className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity">
-              公式サイト →
+              className="bg-primary text-white text-xs font-semibold px-4 py-1.5 rounded-full hover:opacity-80 transition-opacity whitespace-nowrap">
+              公式サイトを見る →
             </a>
           )}
         </div>
+
         <div className="px-4 pb-3">
-          <h2 className="text-base font-bold text-primary leading-snug">{school.name}</h2>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            <span className="text-xs text-muted">{school.city} · {school.type}</span>
-            {school.rating != null && (
-              <span className="text-xs text-amber-500 font-semibold">★ {Number(school.rating).toFixed(1)}</span>
-            )}
-            {school.review_count != null && (
-              <span className="text-xs text-muted">{Number(school.review_count).toLocaleString()}件</span>
-            )}
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <h2 className="text-[15px] font-bold text-primary leading-snug">{school.name}</h2>
+              <p className="text-xs text-muted mt-0.5">{school.city} · {school.type}</p>
+            </div>
             {school.is_partner && (
-              <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full">提携校</span>
+              <span className="flex-shrink-0 text-[9px] bg-primary text-white px-2 py-0.5 rounded-full mt-0.5">提携校</span>
             )}
           </div>
+          {/* 評価バー */}
+          {school.rating != null && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-lg font-bold text-primary">{Number(school.rating).toFixed(1)}</span>
+              <StarRating rating={Number(school.rating)} />
+              {school.review_count != null && (
+                <span className="text-xs text-muted">({Number(school.review_count).toLocaleString()}件)</span>
+              )}
+            </div>
+          )}
         </div>
+
         {/* タブ */}
-        <div className="flex border-t border-border">
+        <div className="flex">
           {(['overview', 'reviews', 'location'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2 text-xs font-semibold transition-colors border-b-2 ${
+              className={`flex-1 py-2.5 text-xs font-semibold transition-colors border-b-2 ${
                 tab === t ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-primary'
               }`}
             >
-              {t === 'overview' ? '概要' : t === 'reviews' ? 'レビュー' : '場所'}
+              {t === 'overview' ? '概要' : t === 'reviews' ? `レビュー${reviews.length ? ` (${reviews.length})` : ''}` : '場所'}
             </button>
           ))}
         </div>
@@ -364,100 +386,151 @@ function SchoolDetailPanel({ school, onBack }: { school: SchoolItem; onBack: () 
 
       {/* コンテンツ */}
       <div className="flex-1 overflow-y-auto">
+        {/* ===== 概要タブ ===== */}
         {tab === 'overview' && (
           <div>
-            {/* 写真グリッド */}
+            {/* 写真グリッド (1大 + 右に2小) */}
             {photos.length > 0 && (
-              <div className="grid gap-0.5" style={{ gridTemplateColumns: photos.length === 1 ? '1fr' : '2fr 1fr' }}>
+              <div className="flex gap-0.5 bg-gray-100" style={{ height: '180px' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photos[0]} alt={school.name} className="w-full object-cover" style={{ height: '180px' }} />
+                <img src={photos[0]} alt={school.name}
+                  className="object-cover flex-shrink-0" style={{ width: photos.length > 1 ? '60%' : '100%', height: '180px' }} />
                 {photos.length > 1 && (
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-0.5 flex-1">
                     {photos.slice(1, 3).map((url, i) => (
                       /* eslint-disable-next-line @next/next/no-img-element */
-                      <img key={i} src={url} alt={`${school.name} ${i + 2}`}
-                        className="w-full object-cover flex-1" style={{ height: '89px' }} />
+                      <img key={i} src={url} alt="" className="object-cover w-full" style={{ height: '89px' }} />
                     ))}
                   </div>
                 )}
               </div>
             )}
+            {photos.length > 3 && (
+              <div className="flex gap-0.5 overflow-x-auto scrollbar-hide px-0 pt-0.5">
+                {photos.slice(3).map((url, i) => (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img key={i} src={url} alt="" className="h-20 w-28 object-cover flex-shrink-0" />
+                ))}
+              </div>
+            )}
+
             <div className="p-4 flex flex-col gap-4">
+              {/* 学費 */}
               {school.fee_per_week && (
-                <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
-                  <span className="text-xs text-muted">週あたり学費の目安</span>
-                  <span className="text-lg font-bold text-primary">¥{school.fee_per_week.toLocaleString()}<span className="text-xs font-normal text-muted">/週</span></span>
+                <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3 border border-border">
+                  <div>
+                    <p className="text-[10px] text-muted uppercase tracking-wide">週あたり学費の目安</p>
+                    <p className="text-xl font-bold text-primary mt-0.5">
+                      ¥{school.fee_per_week.toLocaleString()}
+                      <span className="text-xs font-normal text-muted ml-1">/週</span>
+                    </p>
+                  </div>
+                  <span className="text-2xl">💰</span>
                 </div>
               )}
+
+              {/* 説明 */}
               {school.description && (
-                <p className="text-sm text-primary leading-relaxed">{school.description}</p>
+                <div>
+                  <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">学校について</h3>
+                  <p className="text-sm text-primary leading-relaxed">{school.description}</p>
+                </div>
               )}
+
+              {/* 基本情報チップ */}
+              <div>
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">基本情報</h3>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs bg-gray-100 text-primary px-3 py-1.5 rounded-full">📍 {school.city}</span>
+                  <span className="text-xs bg-gray-100 text-primary px-3 py-1.5 rounded-full">🎓 {school.type}</span>
+                  {school.country && (
+                    <span className="text-xs bg-gray-100 text-primary px-3 py-1.5 rounded-full">🌏 {school.country}</span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
 
+        {/* ===== レビュータブ ===== */}
         {tab === 'reviews' && (
           <div className="p-4">
             {school.rating != null && (
-              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-border">
-                <div className="text-4xl font-bold text-primary">{Number(school.rating).toFixed(1)}</div>
-                <div>
-                  <div className="text-amber-500 text-lg">{'★'.repeat(Math.round(Number(school.rating)))}</div>
+              <div className="flex items-center gap-4 mb-5 pb-5 border-b border-border">
+                <div className="text-center">
+                  <div className="text-5xl font-bold text-primary">{Number(school.rating).toFixed(1)}</div>
+                  <StarRating rating={Number(school.rating)} />
                   {school.review_count != null && (
-                    <div className="text-xs text-muted">{Number(school.review_count).toLocaleString()}件のレビュー</div>
+                    <div className="text-[10px] text-muted mt-1">{Number(school.review_count).toLocaleString()}件</div>
                   )}
+                </div>
+                <div className="flex-1 text-xs text-muted leading-relaxed">
+                  Googleビジネスプロフィールの口コミを表示しています。
                 </div>
               </div>
             )}
             {reviews.length > 0 ? (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {reviews.map((r, i) => (
-                  <div key={i} className="border border-border rounded-xl p-3">
-                    <div className="flex items-center gap-2 mb-2">
+                  <div key={i} className="border-b border-border pb-4 last:border-0">
+                    <div className="flex items-center gap-2.5 mb-2">
                       {r.author_photo ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={r.author_photo} alt={r.author} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                        <img src={r.author_photo} alt={r.author} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                       ) : (
-                        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">{r.author[0]}</div>
+                        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
+                          {r.author[0]}
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-primary truncate">{r.author}</div>
-                        <div className="text-[10px] text-muted">{r.time}</div>
+                        <div className="text-xs font-semibold text-primary">{r.author}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <StarRating rating={r.rating} />
+                          <span className="text-[10px] text-muted">{r.time}</span>
+                        </div>
                       </div>
-                      <div className="text-amber-500 text-xs flex-shrink-0">{'★'.repeat(r.rating)}</div>
                     </div>
                     {r.text && <p className="text-xs text-primary leading-relaxed">{r.text}</p>}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted text-center py-8">レビューはまだありません</p>
+              <div className="text-center py-12">
+                <div className="text-3xl mb-2">💬</div>
+                <p className="text-sm text-muted">まだレビューがありません</p>
+              </div>
             )}
           </div>
         )}
 
+        {/* ===== 場所タブ ===== */}
         {tab === 'location' && (
-          <div className="p-4 flex flex-col gap-3">
-            {school.latitude != null && school.longitude != null ? (
-              <iframe
-                src={`https://www.google.com/maps?q=${school.latitude},${school.longitude}&output=embed`}
-                className="w-full rounded-xl border border-border"
-                style={{ height: '220px', border: 'none' }}
-                loading="lazy"
-                title={school.name}
-              />
-            ) : (
-              <iframe
-                src={`https://www.google.com/maps?q=${encodeURIComponent(school.name + ' ' + school.city)}&output=embed`}
-                className="w-full rounded-xl border border-border"
-                style={{ height: '220px', border: 'none' }}
-                loading="lazy"
-                title={school.name}
-              />
-            )}
-            <div className="flex items-start gap-2 text-sm text-primary">
-              <span className="mt-0.5">📍</span>
-              <span>{school.name}, {school.city}</span>
+          <div>
+            <iframe
+              src={
+                school.latitude != null && school.longitude != null
+                  ? `https://www.google.com/maps?q=${school.latitude},${school.longitude}&output=embed`
+                  : `https://www.google.com/maps?q=${encodeURIComponent(school.name + ' ' + school.city)}&output=embed`
+              }
+              className="w-full"
+              style={{ height: '320px', border: 'none' }}
+              loading="lazy"
+              title={school.name}
+            />
+            <div className="p-4 flex flex-col gap-3">
+              <div className="flex items-start gap-2">
+                <span className="text-base mt-0.5">📍</span>
+                <div>
+                  <p className="text-sm font-semibold text-primary">{school.name}</p>
+                  <p className="text-xs text-muted">{school.city}{school.country ? `, ${school.country}` : ''}</p>
+                </div>
+              </div>
+              {school.website && (
+                <a href={school.website} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs text-primary hover:underline">
+                  <span>🔗</span> {school.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -466,14 +539,20 @@ function SchoolDetailPanel({ school, onBack }: { school: SchoolItem; onBack: () 
   );
 }
 
-export function DynamicSidebar({ context }: Props) {
+export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, onFocusedSchoolChange }: Props) {
   const [focusedCity, setFocusedCity] = useState<CityItem | null>(null);
-  const [focusedSchool, setFocusedSchool] = useState<SchoolItem | null>(null);
+  const [internalFocusedSchool, setInternalFocusedSchool] = useState<SchoolItem | null>(null);
   const [hoveredSchool, setHoveredSchool] = useState<SchoolItem | null>(null);
   const { countries, cities, schools, showAgents } = context;
   const hasContext = countries.length > 0 || cities.length > 0 || schools.length > 0 || showAgents;
 
-  if (!hasContext) return <RecommendationPanel />;
+  const focusedSchool = externalFocusedSchool ?? internalFocusedSchool;
+  const setFocusedSchool = (school: SchoolItem | null) => {
+    setInternalFocusedSchool(school);
+    onFocusedSchoolChange?.(school);
+  };
+
+  if (!hasContext && !focusedSchool) return <RecommendationPanel />;
 
   if (focusedSchool) {
     return <SchoolDetailPanel school={focusedSchool} onBack={() => setFocusedSchool(null)} />;

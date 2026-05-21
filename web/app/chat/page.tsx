@@ -55,7 +55,7 @@ function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text
   );
 }
 
-function InlineSchoolCards({ schools, onSend }: { schools: SchoolItem[]; onSend: (text: string) => void }) {
+function InlineSchoolCards({ schools, onSelectSchool }: { schools: SchoolItem[]; onSelectSchool: (school: SchoolItem) => void }) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
       {schools.map(school => {
@@ -63,7 +63,7 @@ function InlineSchoolCards({ schools, onSend }: { schools: SchoolItem[]; onSend:
         return (
           <button
             key={school.id}
-            onClick={() => onSend(`${school.name}（${school.city}）について詳しく教えてください。`)}
+            onClick={() => onSelectSchool(school)}
             className="flex-shrink-0 w-64 rounded-2xl border border-border bg-white shadow-sm hover:shadow-md hover:scale-[1.01] transition-all text-left overflow-hidden"
           >
             {/* 画像 */}
@@ -201,6 +201,7 @@ export default function ChatPage() {
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
+  const [sidebarFocusedSchool, setSidebarFocusedSchool] = useState<SchoolItem | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -356,7 +357,13 @@ export default function ChatPage() {
                           <InlineCityCards cities={msg.context.cities} onSend={handleSend} />
                         )}
                         {msg.context.schools.length > 0 && (
-                          <InlineSchoolCards schools={msg.context.schools} onSend={handleSend} />
+                          <InlineSchoolCards
+                            schools={msg.context.schools}
+                            onSelectSchool={(school) => {
+                              setSidebarFocusedSchool(school);
+                              setShowRightPanel(true);
+                            }}
+                          />
                         )}
                       </div>
                     )
@@ -422,7 +429,11 @@ export default function ChatPage() {
           <span className="text-xs font-semibold text-muted uppercase tracking-wide">{sidebarLabel}</span>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <DynamicSidebar context={sidebarContext} />
+          <DynamicSidebar
+            context={sidebarContext}
+            focusedSchool={sidebarFocusedSchool}
+            onFocusedSchoolChange={setSidebarFocusedSchool}
+          />
         </div>
       </div>
 
