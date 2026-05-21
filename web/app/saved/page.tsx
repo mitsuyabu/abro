@@ -90,7 +90,7 @@ export default function SavedPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-7">
             {items.map(item => (
               <div key={item.id} className="group cursor-pointer">
-                <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-gray-100 mb-3">
+                <div className="relative rounded-2xl overflow-hidden aspect-[502/376] bg-gray-100 mb-3">
                   {item.image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img

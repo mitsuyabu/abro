@@ -121,7 +121,7 @@ export default function InspirationPage() {
 function GuideCard({ guide, isSaved, onSave }: { guide: Guide; isSaved: boolean; onSave: () => void }) {
   return (
     <div className="group cursor-pointer">
-      <div className="relative rounded-2xl overflow-hidden aspect-square bg-gray-100 mb-3">
+      <div className="relative rounded-2xl overflow-hidden aspect-[239/273] bg-gray-100 mb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={guide.coverImage}
