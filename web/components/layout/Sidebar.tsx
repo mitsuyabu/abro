@@ -104,7 +104,10 @@ export function Sidebar() {
         {/* フッター：ユーザー */}
         <div className="border-t border-border px-2 lg:px-3 py-3">
           {/* ユーザーアバター＋名前 */}
-          <div className="flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl">
+          <Link
+            href="/profile"
+            className="flex items-center justify-center lg:justify-start gap-3 px-2 lg:px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
+          >
             {user?.user_metadata?.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -120,7 +123,7 @@ export function Sidebar() {
             <span className="hidden lg:block text-sm font-medium text-primary flex-1 truncate">
               {user?.user_metadata?.name ?? user?.email ?? 'ゲスト'}
             </span>
-          </div>
+          </Link>
 
           {/* ログアウトボタン */}
           <button
