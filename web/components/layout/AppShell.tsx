@@ -12,7 +12,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full">
       <Sidebar />
-      <main className="flex-1 h-full overflow-hidden pb-16 md:pb-0 md:ml-16 lg:ml-52">
+      <main className="flex-1 h-full overflow-hidden pb-16 md:pb-0 min-w-0">
         {children}
       </main>
     </div>
