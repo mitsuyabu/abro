@@ -69,11 +69,6 @@ export function Sidebar() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={item.icon} alt={item.label} className="w-7 h-7 lg:w-8 lg:h-8 object-contain flex-shrink-0" style={{ mixBlendMode: 'multiply' }} />
                 <span className="hidden lg:block flex-1">{item.label}</span>
-                {item.badge ? (
-                  <span className="hidden lg:block text-xs bg-primary text-white font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-                    {item.badge}
-                  </span>
-                ) : null}
               </Link>
             );
           })}
