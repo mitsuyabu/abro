@@ -47,7 +47,7 @@ export function Sidebar() {
         <div className="flex-shrink-0 h-12 border-b border-border flex items-center justify-center lg:justify-start px-3 lg:px-5">
           <Link href="/chat" className="hover:opacity-80 transition-opacity overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Abro" className="h-8 lg:h-9 w-auto object-contain object-left" />
+            <img src="/logo.png?v=2" alt="Abro" className="h-8 lg:h-9 w-auto object-contain object-left" />
           </Link>
         </div>
 
