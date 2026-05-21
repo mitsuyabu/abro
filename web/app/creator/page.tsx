@@ -161,7 +161,7 @@ export default function CreatorPage() {
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center mb-6 shadow-lg">
                   <span className="text-3xl text-white font-light">＋</span>
                 </div>
-                <h2 className="text-2xl font-bold text-primary mb-2">美しいガイドを作ろう</h2>
+                <h2 className="text-2xl font-bold text-primary mb-2">あなたの体験をガイドにしよう</h2>
                 <p className="text-muted text-sm mb-8 leading-relaxed">
                   あなたの留学・ワーホリ体験を共有して、<br />次の世代の旅人を助けましょう
                 </p>
