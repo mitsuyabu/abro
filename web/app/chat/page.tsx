@@ -22,11 +22,25 @@ const DEFAULT_SUGGESTIONS = [
   '何から始めればいい？',
 ];
 
+interface GeneratedPlan {
+  title: string;
+  destination_country: string;
+  destination_city: string;
+  duration_label: string;
+  budget_min_jpy: number;
+  budget_max_jpy: number;
+  initial_plan: string;
+  reason: string;
+  pre_departure: Record<string, string>;
+  timeline: { period: string; tasks: string[] }[];
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   context?: SidebarContext;
+  planData?: { id: string; plan: GeneratedPlan };
 }
 
 function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text: string) => void }) {
@@ -194,9 +208,85 @@ function getContextSuggestions(context: SidebarContext, latestAI: string): strin
 
 const avatarStyle: React.CSSProperties = AVATAR_STYLE; // unused but kept for type compat
 
+const PRE_DEPARTURE_LABELS: Record<string, string> = {
+  visa: 'ビザ申請',
+  school: '学校選び',
+  accommodation: '宿泊・住まい',
+  insurance: '保険',
+  flights: '航空券',
+  local_preparation: '現地準備',
+  job_search: '仕事探し',
+  english_study: '英語学習',
+};
+
+function PlanCard({ planId, plan }: { planId: string; plan: GeneratedPlan }) {
+  const [expanded, setExpanded] = useState(false);
+  const budgetMin = Math.round(plan.budget_min_jpy / 10000);
+  const budgetMax = Math.round(plan.budget_max_jpy / 10000);
+
+  return (
+    <div className="mt-2 pl-9 sm:pl-11">
+      <div className="border border-primary/20 rounded-2xl overflow-hidden bg-white shadow-sm max-w-md">
+        {/* ヘッダー */}
+        <div className="bg-gradient-to-r from-primary/90 to-primary px-4 py-3">
+          <p className="text-white text-[11px] font-semibold uppercase tracking-wide opacity-80">AI プラン</p>
+          <h3 className="text-white text-sm font-bold leading-snug mt-0.5">{plan.title}</h3>
+        </div>
+
+        {/* 概要 */}
+        <div className="px-4 py-3 flex flex-col gap-2">
+          <div className="flex flex-wrap gap-3 text-[12px] text-primary/80">
+            <span>📍 {plan.destination_country} / {plan.destination_city}</span>
+            <span>🗓 {plan.duration_label}</span>
+            <span>💰 {budgetMin}〜{budgetMax}万円</span>
+          </div>
+
+          {plan.initial_plan && (
+            <p className="text-xs text-muted leading-relaxed">{plan.initial_plan}</p>
+          )}
+
+          {plan.reason && (
+            <div className="bg-primary/5 rounded-xl px-3 py-2">
+              <p className="text-xs text-primary leading-relaxed">{plan.reason}</p>
+            </div>
+          )}
+
+          {/* 渡航前準備トグル */}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="flex items-center justify-between w-full text-xs font-semibold text-primary mt-1 hover:opacity-70 transition-opacity"
+          >
+            <span>渡航前準備を見る</span>
+            <span>{expanded ? '▲' : '▼'}</span>
+          </button>
+
+          {expanded && plan.pre_departure && (
+            <div className="flex flex-col gap-2 mt-1">
+              {Object.entries(plan.pre_departure).map(([key, val]) => (
+                <div key={key} className="border border-border rounded-xl px-3 py-2">
+                  <p className="text-[11px] font-bold text-primary mb-0.5">{PRE_DEPARTURE_LABELS[key] ?? key}</p>
+                  <p className="text-[11px] text-muted leading-relaxed">{val}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <a
+            href="/plans"
+            className="mt-1 w-full bg-primary text-white text-xs font-semibold py-2 rounded-xl text-center block hover:opacity-80 transition-opacity"
+          >
+            プランページで確認する →
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
@@ -265,6 +355,31 @@ export default function ChatPage() {
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGeneratePlan = async () => {
+    setIsGeneratingPlan(true);
+    try {
+      const res = await fetch('/api/generate-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
+      });
+      const data = await res.json() as { id: string; plan: GeneratedPlan };
+      if (data.id && data.plan) {
+        const planMsg: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: 'プランを作成しました！内容を確認してください。',
+          planData: { id: data.id, plan: data.plan },
+        };
+        setMessages(prev => [...prev, planMsg]);
+      }
+    } catch {
+      /* プラン生成失敗は無視 */
+    } finally {
+      setIsGeneratingPlan(false);
     }
   };
 
@@ -357,8 +472,12 @@ export default function ChatPage() {
                       ) : msg.content}
                     </div>
                   </div>
+                  {/* プランカード */}
+                  {msg.role === 'assistant' && msg.planData && (
+                    <PlanCard planId={msg.planData.id} plan={msg.planData.plan} />
+                  )}
                   {/* インラインカード（AI返答の下） */}
-                  {msg.role === 'assistant' && msg.context && (
+                  {msg.role === 'assistant' && msg.context && !msg.planData && (
                     (msg.context.cities.length > 0 || msg.context.schools.length > 0) && (
                       <div className="mt-2 pl-9 sm:pl-11 flex flex-col gap-2">
                         {msg.context.cities.length > 0 && (
@@ -412,6 +531,19 @@ export default function ChatPage() {
                 </div>
               )}
               <div className="flex gap-2 overflow-x-auto pb-2 mb-2 sm:mb-3 scrollbar-hide">
+                {messages.length >= 4 && (
+                  <button
+                    onClick={handleGeneratePlan}
+                    disabled={isLoading || isGeneratingPlan}
+                    className="flex-shrink-0 bg-primary text-white border border-primary rounded-full px-3 py-1.5 text-xs font-semibold hover:opacity-80 transition-all disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {isGeneratingPlan ? (
+                      <><span className="animate-spin inline-block">⏳</span> 作成中...</>
+                    ) : (
+                      <>✨ プランを作成する</>
+                    )}
+                  </button>
+                )}
                 {suggestions.map(s => (
                   <button
                     key={s}

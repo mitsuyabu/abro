@@ -1,0 +1,6 @@
+-- プランに詳細JSONBカラムを追加
+ALTER TABLE public.plans
+  ADD COLUMN IF NOT EXISTS details JSONB,
+  ADD COLUMN IF NOT EXISTS budget_max_jpy INTEGER,
+  ADD COLUMN IF NOT EXISTS reason TEXT,
+  ADD COLUMN IF NOT EXISTS initial_plan TEXT;
