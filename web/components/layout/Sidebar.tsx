@@ -78,14 +78,22 @@ export function Sidebar() {
             );
           })}
 
-          {/* 新しいチャットボタン（デスクトップのみ） */}
-          <div className="hidden lg:block mt-3 px-0">
-            <button
-              onClick={() => router.push('/chat')}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-primary text-sm font-semibold py-2.5 rounded-full transition-colors"
+          {/* 作成ボタン */}
+          <div className="mt-3">
+            <Link
+              href="/creator"
+              className="hidden lg:flex w-full items-center justify-center gap-2 bg-primary text-white text-sm font-semibold py-2.5 rounded-full hover:opacity-80 transition-opacity"
             >
-              新しいチャット
-            </button>
+              <span className="text-base leading-none">＋</span>
+              <span>作成する</span>
+            </Link>
+            <Link
+              href="/creator"
+              title="作成する"
+              className="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white text-lg hover:opacity-80 transition-opacity mx-auto"
+            >
+              ＋
+            </Link>
           </div>
         </nav>
 
