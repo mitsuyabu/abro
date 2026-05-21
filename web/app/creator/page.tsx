@@ -71,14 +71,14 @@ export default function CreatorPage() {
             </div>
 
             {/* インスピレーション写真 */}
-            <div className="flex gap-3 px-6 overflow-x-auto pb-6 scrollbar-hide">
+            <div className="flex gap-3 px-4 overflow-x-auto pb-6 scrollbar-hide">
               {INSPIRATION_PHOTOS.map((url, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={i}
                   src={url}
                   alt=""
-                  className="flex-shrink-0 w-40 aspect-[304/347] object-cover rounded-2xl"
+                  className="flex-shrink-0 w-[280px] aspect-[304/347] object-cover rounded-2xl"
                 />
               ))}
             </div>
