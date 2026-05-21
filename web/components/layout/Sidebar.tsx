@@ -43,14 +43,13 @@ export function Sidebar() {
     <>
       {/* デスクトップ・タブレット：左サイドバー */}
       <aside className="hidden md:flex md:flex-col fixed left-0 top-0 h-full w-16 lg:w-52 bg-white border-r border-border z-40">
-        {/* ロゴ */}
-        <Link
-          href="/chat"
-          className="flex items-center justify-center lg:justify-start px-3 lg:px-5 py-4 hover:opacity-80 transition-opacity overflow-hidden"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Abro" className="h-8 lg:h-9 w-auto object-contain object-left" />
-        </Link>
+        {/* ヘッダー：ロゴ */}
+        <div className="flex-shrink-0 h-14 border-b border-border flex items-center justify-center lg:justify-start px-3 lg:px-5">
+          <Link href="/chat" className="hover:opacity-80 transition-opacity overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Abro" className="h-8 lg:h-9 w-auto object-contain object-left" />
+          </Link>
+        </div>
 
         {/* メインナビ */}
         <nav className="flex flex-col gap-0.5 px-2 lg:px-3 flex-1">
