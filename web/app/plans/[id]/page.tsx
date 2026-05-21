@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { AgentContactModal } from '@/components/AgentContactModal';
 
 interface PlanDetails {
   duration_label?: string;
@@ -58,6 +59,9 @@ export default function PlanDetailPage() {
   const [newNote, setNewNote] = useState('');
   const [newItemLabel, setNewItemLabel] = useState('');
   const [newItemType, setNewItemType] = useState<'school' | 'city' | 'other'>('other');
+
+  // エージェントモーダル
+  const [showAgentModal, setShowAgentModal] = useState(false);
 
   // 再提案
   const [showRegenForm, setShowRegenForm] = useState(false);
@@ -182,18 +186,29 @@ export default function PlanDetailPage() {
       )}
 
       {/* トップバー */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-border px-6 py-3 flex items-center justify-between">
-        <Link href="/plans" className="flex items-center gap-1.5 text-sm text-muted hover:text-primary transition-colors">
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-border px-6 py-3 flex items-center justify-between gap-2">
+        <Link href="/plans" className="flex items-center gap-1.5 text-sm text-muted hover:text-primary transition-colors flex-shrink-0">
           <span className="text-lg leading-none">‹</span>
           <span>プラン一覧</span>
         </Link>
-        <button
-          onClick={() => setShowRegenForm(v => !v)}
-          className="flex items-center gap-1.5 text-sm font-semibold text-primary border border-primary/30 px-3 py-1.5 rounded-full hover:bg-primary/5 transition-all"
-        >
-          <span>✨</span>
-          <span>再提案する</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAgentModal(true)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-all"
+          >
+            <span>🎓</span>
+            <span className="hidden sm:inline">エージェントに相談</span>
+            <span className="sm:hidden">相談</span>
+          </button>
+          <button
+            onClick={() => setShowRegenForm(v => !v)}
+            className="flex items-center gap-1.5 text-sm font-semibold text-primary border border-primary/30 px-3 py-1.5 rounded-full hover:bg-primary/5 transition-all"
+          >
+            <span>✨</span>
+            <span className="hidden sm:inline">再提案する</span>
+            <span className="sm:hidden">再提案</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex min-h-0">
@@ -411,6 +426,21 @@ export default function PlanDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* エージェント相談モーダル */}
+      <AgentContactModal
+        isOpen={showAgentModal}
+        onClose={() => setShowAgentModal(false)}
+        planId={plan.id}
+        context={[
+          plan.title,
+          (plan.destination_city || plan.destination_country) ? `渡航先：${plan.destination_city ?? plan.destination_country}` : null,
+          duration ? `期間：${duration}` : null,
+          plan.purpose ? `目的：${PURPOSE_LABEL[plan.purpose] ?? plan.purpose}` : null,
+          budgetLabel ? `予算：${budgetLabel}` : null,
+          plan.initial_plan ? `プラン：${plan.initial_plan}` : null,
+        ].filter(Boolean).join('　')}
+      />
 
       {/* モバイル：渡航前準備 */}
       {featureSections.length > 0 && (

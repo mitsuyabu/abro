@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
+import { AgentContactModal } from '@/components/AgentContactModal';
 
 const SidebarMapMobile = dynamic(() => import('@/components/chat/SidebarMap'), { ssr: false });
 
@@ -290,6 +291,8 @@ export default function ChatPage() {
   const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [agentBannerDismissed, setAgentBannerDismissed] = useState(false);
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const [sidebarFocusedSchool, setSidebarFocusedSchool] = useState<SchoolItem | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -530,6 +533,24 @@ export default function ChatPage() {
                   </button>
                 </div>
               )}
+              {/* エージェントバナー（6件以上の会話で表示） */}
+              {messages.length >= 6 && !agentBannerDismissed && (
+                <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 mb-2">
+                  <span className="text-xl flex-shrink-0">🎓</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-amber-800">専門エージェントに相談しませんか？</p>
+                    <p className="text-[11px] text-amber-700">無料カウンセリングでプランをより具体的に</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAgentModal(true)}
+                    className="flex-shrink-0 bg-amber-500 text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity"
+                  >
+                    相談する
+                  </button>
+                  <button onClick={() => setAgentBannerDismissed(true)} className="text-amber-400 hover:text-amber-600 flex-shrink-0 text-sm">✕</button>
+                </div>
+              )}
+
               <div className="flex gap-2 overflow-x-auto pb-2 mb-2 sm:mb-3 scrollbar-hide">
                 {messages.length >= 4 && (
                   <button
@@ -576,6 +597,13 @@ export default function ChatPage() {
           />
         </div>
       </div>
+
+      {/* エージェント相談モーダル */}
+      <AgentContactModal
+        isOpen={showAgentModal}
+        onClose={() => setShowAgentModal(false)}
+        context={messages.length > 0 ? messages.filter(m => m.role === 'user').slice(-3).map(m => m.content).join('、') : undefined}
+      />
 
       {/* モバイル：全画面マップオーバーレイ */}
       {showMapView && (
