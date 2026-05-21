@@ -251,6 +251,14 @@ export default function ChatPage() {
       const ctx = detectSidebarContext(fullContent, text, allSchools);
       setSidebarContext(ctx);
       setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx } : m));
+
+      // 渡航情報を非同期抽出（チャットをブロックしない）
+      const extractMsgs = [...newMessages, { role: 'assistant', content: fullContent }];
+      fetch('/api/extract-travel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: extractMsgs.map(m => ({ role: m.role, content: m.content })) }),
+      }).catch(() => {/* 失敗しても無視 */});
     } catch {
       setMessages(prev =>
         prev.map(m => m.id === aiId ? { ...m, content: 'エラーが発生しました。もう一度お試しください。' } : m)
