@@ -30,13 +30,12 @@ interface GuideEntry {
 }
 
 // ─── Hub data ─────────────────────────────────────────────────
+// オーストラリアの都市のみ：シドニー・メルボルン・ゴールドコースト・ブリスベン
 const INSPIRATION_PHOTOS = [
   'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=400&q=80',
-  'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&q=80',
-  'https://images.unsplash.com/photo-1560814304-4f05b62af116?w=400&q=80',
-  'https://images.unsplash.com/photo-1507699622108-4be3abd695ad?w=400&q=80',
   'https://images.unsplash.com/photo-1545044846-351ba102b6d5?w=400&q=80',
   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&q=80',
+  'https://images.unsplash.com/photo-1524820801657-fd59673fbb05?w=400&q=80',
 ];
 
 const INITIAL_GUIDES: GuideEntry[] = [
