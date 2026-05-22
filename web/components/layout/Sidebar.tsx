@@ -42,7 +42,7 @@ export function Sidebar() {
   return (
     <>
       {/* デスクトップ・タブレット：左サイドバー */}
-      <aside className="hidden md:flex md:flex-col flex-shrink-0 w-16 lg:w-52 h-full bg-white border-r border-border z-40">
+      <aside className="hidden md:flex md:flex-col flex-shrink-0 w-16 lg:w-52 h-full overflow-hidden bg-white border-r border-border z-40">
         {/* ヘッダー：ロゴ */}
         <div className="flex-shrink-0 h-12 border-b border-border flex items-center justify-center lg:justify-start px-3 lg:px-5">
           <Link href="/chat" className="hover:opacity-80 transition-opacity overflow-hidden">
@@ -52,7 +52,7 @@ export function Sidebar() {
         </div>
 
         {/* メインナビ */}
-        <nav className="flex flex-col gap-0.5 px-2 lg:px-3 flex-1">
+        <nav className="flex flex-col gap-0.5 px-2 lg:px-3 flex-1 min-h-0 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
