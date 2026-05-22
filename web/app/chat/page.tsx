@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
 import { AgentContactModal } from '@/components/AgentContactModal';
+import { getInitialState, advancePhase, type ConversationState } from '@/utils/conversationManager';
 
 const SidebarMapMobile = dynamic(() => import('@/components/chat/SidebarMap'), { ssr: false });
 
@@ -374,6 +375,7 @@ export default function ChatPage() {
   const [agentBannerDismissed, setAgentBannerDismissed] = useState(false);
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const [sidebarFocusedSchool, setSidebarFocusedSchool] = useState<SchoolItem | null>(null);
+  const [conversationState, setConversationState] = useState<ConversationState>(getInitialState());
   const bottomRef = useRef<HTMLDivElement>(null);
   const msgCountRef = useRef(0);
 
@@ -409,8 +411,31 @@ export default function ChatPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+          collectedInfo: conversationState.collectedInfo,
+          currentPhase:  conversationState.currentPhase,
+        }),
       });
+
+      // メタデータをヘッダーから取得（スコアリング結果・フェーズ更新）
+      const metaHeader = res.headers.get('X-Abro-Meta');
+      if (metaHeader) {
+        try {
+          const meta = JSON.parse(metaHeader) as {
+            collectedInfo: ConversationState['collectedInfo'];
+            currentPhase:  ConversationState['currentPhase'];
+            scoreResult:   { city: string; city_en: string; totalScore: number; rank: number }[] | null;
+          };
+          setConversationState(prev => ({
+            ...prev,
+            collectedInfo:   meta.collectedInfo,
+            currentPhase:    meta.currentPhase,
+            proposedCity:    meta.scoreResult?.[0]?.city ?? prev.proposedCity,
+            proposedCountry: 'オーストラリア',
+          }));
+        } catch { /* メタ解析失敗は無視 */ }
+      }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -424,6 +449,12 @@ export default function ChatPage() {
         fullContent += chunk;
         setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: m.content + chunk } : m));
       }
+
+      // AIの返答からフェーズをさらに進める（AIが都市・学校・滞在先に言及した場合）
+      setConversationState(prev => {
+        const nextPh = advancePhase(prev, fullContent);
+        return nextPh !== prev.currentPhase ? { ...prev, currentPhase: nextPh } : prev;
+      });
 
       const ctx = detectSidebarContext(fullContent, text, allSchools);
       const quickSelect = detectQuickSelect(fullContent);

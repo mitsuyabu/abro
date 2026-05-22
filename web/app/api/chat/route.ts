@@ -1,9 +1,75 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import { extractInfoFromMessage, hasBasicInfo, toUserAnswers, advancePhase, getInitialState, type ConversationState, type CollectedInfo, type ConversationPhase } from "@/utils/conversationManager";
+import { rankCities, type CityRawData, type CityScoreResult } from "@/utils/scoring";
+import { buildConversationPrompt } from "@/utils/promptBuilder";
 
 export const dynamic = "force-dynamic";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+/** Supabaseの複数テーブルを結合して都市スコアリング用の生データを取得する */
+async function fetchCitiesRawData(): Promise<CityRawData[]> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const [climateRes, costRes, safetyRes, jobsRes, schoolsRes] = await Promise.all([
+      supabase.from('city_climate').select('city_id, city, city_en, sunshine_hours'),
+      supabase.from('city_cost_of_living').select('city, rent_1br_city_aud'),
+      supabase.from('city_safety').select('city_en, safety_index'),
+      supabase.from('city_jobs').select('city_id, score_jobs, score_japanese_jobs'),
+      supabase.from('schools').select('city'),
+    ]);
+
+    // city_climate を基準に Map を作成
+    const map = new Map<string, CityRawData>();
+    for (const r of (climateRes.data ?? [])) {
+      map.set(r.city_id, {
+        city_id: r.city_id, city: r.city, city_en: r.city_en,
+        rent_1br_city_aud: null, safety_index: null,
+        sunshine_hours: r.sunshine_hours ?? null,
+        score_jobs: null, score_japanese_jobs: null, school_count: 0,
+      });
+    }
+
+    // 生活費（日本語の都市名でマッチ）
+    for (const r of (costRes.data ?? [])) {
+      for (const v of map.values()) {
+        if (v.city === r.city) { v.rent_1br_city_aud = r.rent_1br_city_aud ?? null; }
+      }
+    }
+    // 治安（英語名でマッチ）
+    for (const r of (safetyRes.data ?? [])) {
+      for (const v of map.values()) {
+        if (v.city_en === r.city_en) { v.safety_index = r.safety_index ?? null; }
+      }
+    }
+    // 仕事スコア（city_id でマッチ）
+    for (const r of (jobsRes.data ?? [])) {
+      const v = map.get(r.city_id);
+      if (v) { v.score_jobs = r.score_jobs ?? null; v.score_japanese_jobs = r.score_japanese_jobs ?? null; }
+    }
+    // 語学学校カウント（日本語の都市名でカウント）
+    for (const r of (schoolsRes.data ?? [])) {
+      for (const v of map.values()) {
+        if (v.city === r.city) v.school_count++;
+      }
+    }
+
+    return [...map.values()];
+  } catch (e) {
+    console.error('[fetchCitiesRawData error]', e);
+    return [];
+  }
+}
+
+/** スコアリングが必要なフェーズかどうか */
+function needsScoring(phase: ConversationPhase): boolean {
+  return ['city', 'school', 'accommodation', 'summary'].includes(phase);
+}
 
 async function fetchCityJobsPrompt(): Promise<string> {
   try {
@@ -852,7 +918,39 @@ const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデー
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    const { messages } = body;
+
+    // クライアントから会話状態を受け取る（なければ初期値）
+    const rawInfo:  CollectedInfo      = body.collectedInfo  ?? getInitialState().collectedInfo;
+    const rawPhase: ConversationPhase  = body.currentPhase   ?? 'greeting';
+
+    // 最新のユーザーメッセージから情報を抽出
+    const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')?.content ?? '';
+    const updatedInfo = extractInfoFromMessage(lastUserMsg, rawInfo);
+
+    // フェーズを決定（基本情報が揃ったら country へ）
+    let currentPhase: ConversationPhase = rawPhase;
+    if (rawPhase === 'greeting') currentPhase = 'info_gathering';
+    if (rawPhase === 'info_gathering' && hasBasicInfo(updatedInfo)) currentPhase = 'country';
+
+    // スコアリング（city フェーズ以降のみ）
+    let scoreResults: CityScoreResult[] | undefined;
+    if (needsScoring(currentPhase)) {
+      const citiesData = await fetchCitiesRawData();
+      const userAnswers = toUserAnswers(updatedInfo);
+      scoreResults = rankCities(citiesData, userAnswers);
+    }
+
+    // 会話状態を構築
+    const conversationState: ConversationState = {
+      collectedInfo:   updatedInfo,
+      currentPhase,
+      proposedCountry: 'オーストラリア',
+      proposedCity:    scoreResults?.[0]?.city ?? null,
+    };
+
+    // Supabase データ取得 + 会話フェーズプロンプトを並行構築
     const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt, climatePrompt, jobsPrompt] = await Promise.all([
       fetchSchoolsPrompt(),
       fetchCostOfLivingPrompt(),
@@ -862,12 +960,37 @@ export async function POST(req: Request) {
       fetchCityJobsPrompt(),
     ]);
 
+    const conversationPrompt = buildConversationPrompt(conversationState, scoreResults);
+
+    // OpenAI ストリーミング
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2048,
       stream: true,
-      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt + costPrompt + visaPrompt + safetyPrompt + climatePrompt + jobsPrompt }, ...messages],
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT
+            + schoolsPrompt + costPrompt + visaPrompt
+            + safetyPrompt + climatePrompt + jobsPrompt
+            + conversationPrompt,
+        },
+        ...messages,
+      ],
     });
+
+    // レスポンスメタデータ（ヘッダーで返す）
+    const meta = {
+      collectedInfo: updatedInfo,
+      currentPhase,
+      scoreResult: scoreResults
+        ? scoreResults.slice(0, 4).map(r => ({
+            city: r.city, city_en: r.city_en,
+            totalScore: r.totalScore, rank: r.rank,
+            flags: r.flags,
+          }))
+        : null,
+    };
 
     const encoder = new TextEncoder();
     const readable = new ReadableStream({
@@ -886,7 +1009,11 @@ export async function POST(req: Request) {
     });
 
     return new Response(readable, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Abro-Meta": JSON.stringify(meta),
+        "Access-Control-Expose-Headers": "X-Abro-Meta",
+      },
     });
   } catch (e) {
     console.error("[chat API error]", e);
