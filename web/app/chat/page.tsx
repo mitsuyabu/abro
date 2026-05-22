@@ -368,6 +368,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
   const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
@@ -376,8 +377,56 @@ export default function ChatPage() {
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const [sidebarFocusedSchool, setSidebarFocusedSchool] = useState<SchoolItem | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>(getInitialState());
+  const [chatLoaded, setChatLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const msgCountRef = useRef(0);
+
+  // チャット履歴をlocalStorageから復元
+  useEffect(() => {
+    try {
+      const savedMsgs = localStorage.getItem('abro-chat-messages');
+      const savedState = localStorage.getItem('abro-conversation-state');
+      if (savedMsgs) {
+        const parsed = JSON.parse(savedMsgs) as Message[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+          msgCountRef.current = parsed.length;
+        }
+      }
+      if (savedState) {
+        setConversationState(JSON.parse(savedState));
+      }
+    } catch { /* ignore */ }
+    setChatLoaded(true);
+  }, []);
+
+  // メッセージをlocalStorageに保存
+  useEffect(() => {
+    if (!chatLoaded) return;
+    try {
+      localStorage.setItem('abro-chat-messages', JSON.stringify(messages));
+    } catch { /* ignore */ }
+  }, [messages, chatLoaded]);
+
+  // 会話状態をlocalStorageに保存
+  useEffect(() => {
+    if (!chatLoaded) return;
+    try {
+      localStorage.setItem('abro-conversation-state', JSON.stringify(conversationState));
+    } catch { /* ignore */ }
+  }, [conversationState, chatLoaded]);
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setConversationState(getInitialState());
+    setSidebarContext({ countries: [], cities: [], schools: [], showAgents: false });
+    setPlanError(null);
+    msgCountRef.current = 0;
+    try {
+      localStorage.removeItem('abro-chat-messages');
+      localStorage.removeItem('abro-conversation-state');
+    } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     fetch('/api/schools').then(r => r.json()).then(data => {
@@ -479,12 +528,24 @@ export default function ChatPage() {
 
   const handleGeneratePlan = async () => {
     setIsGeneratingPlan(true);
+    setPlanError(null);
     try {
       const res = await fetch('/api/generate-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content })) }),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string };
+        if (res.status === 401) {
+          setPlanError('セッションが切れています。再ログインしてください。');
+        } else {
+          setPlanError(errData.error ?? 'プランの作成に失敗しました。もう一度お試しください。');
+        }
+        return;
+      }
+
       const data = await res.json() as { id: string; plan: GeneratedPlan };
       if (data.id && data.plan) {
         const planMsg: Message = {
@@ -494,9 +555,11 @@ export default function ChatPage() {
           planData: { id: data.id, plan: data.plan },
         };
         setMessages(prev => [...prev, planMsg]);
+      } else {
+        setPlanError('プランの作成に失敗しました。もう一度お試しください。');
       }
     } catch {
-      /* プラン生成失敗は無視 */
+      setPlanError('ネットワークエラーが発生しました。接続を確認してください。');
     } finally {
       setIsGeneratingPlan(false);
     }
@@ -524,8 +587,13 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* トップバー */}
         <div className="h-12 border-b border-border flex items-center px-4 md:px-5 bg-white gap-2">
-          <span className="text-sm font-semibold text-primary">新しいチャット</span>
-          <span className="text-muted text-xs">▾</span>
+          <button
+            onClick={handleNewChat}
+            className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+          >
+            <span className="text-sm font-semibold text-primary">新しいチャット</span>
+            <span className="text-muted text-xs">▾</span>
+          </button>
           <span className="ml-auto text-xs font-medium text-primary/60 italic tracking-wide hidden sm:block">留学を、もっと自分らしく</span>
         </div>
 
@@ -675,6 +743,13 @@ export default function ChatPage() {
                 </div>
               )}
 
+              {planError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-2 text-xs text-red-700">
+                  <span>⚠️</span>
+                  <span>{planError}</span>
+                  <button onClick={() => setPlanError(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+                </div>
+              )}
               <div className="flex gap-2 overflow-x-auto pb-2 mb-2 sm:mb-3 scrollbar-hide">
                 {messages.length >= 4 && (
                   <button
