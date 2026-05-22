@@ -247,9 +247,19 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
 }
 
 function detectQuickSelect(content: string): QuickSelectType {
-  const schoolPatterns = ['学校に通う期間', '語学学校の期間', '通う期間', '何ヶ月通', '就学期間'];
-  const stayPatterns = ['滞在期間', 'どのくらい滞在', '何ヶ月滞在', '留学期間', 'ワーホリ期間', '何ヶ月くらいいる', '何ヶ月くらい過ごす'];
-  const monthPatterns = ['いつ頃', '何月', '出発時期', '行く時期', '渡航時期', '何月ごろ', 'いつ出発', '何月から', '何月に'];
+  const schoolPatterns = [
+    '学校に通う期間', '語学学校の期間', '通う期間', '何ヶ月通', '就学期間', '通学期間',
+    '語学学校に通う', '学校期間',
+  ];
+  const stayPatterns = [
+    '滞在期間', 'どのくらい滞在', '何ヶ月滞在', '留学期間', 'ワーホリ期間',
+    'どのくらいの期間', '期間を考えて', '期間はどのくらい', '何ヶ月くらい',
+    '期間について', 'どれくらいの期間', '何ヶ月お', '何ヶ月間',
+  ];
+  const monthPatterns = [
+    'いつ頃', '何月', '出発時期', '行く時期', '渡航時期', 'いつ出発',
+    '何月ごろ', '何月から', '何月に行', '時期はいつ', '出発はいつ', 'いつから',
+  ];
 
   if (schoolPatterns.some(p => content.includes(p))) return 'school-duration';
   if (stayPatterns.some(p => content.includes(p))) return 'stay-duration';
@@ -365,6 +375,7 @@ export default function ChatPage() {
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const [sidebarFocusedSchool, setSidebarFocusedSchool] = useState<SchoolItem | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const msgCountRef = useRef(0);
 
   useEffect(() => {
     fetch('/api/schools').then(r => r.json()).then(data => {
@@ -377,9 +388,13 @@ export default function ChatPage() {
     }).catch(e => console.error('[Abro] schools fetch error:', e));
   }, []);
 
+  // メッセージ数が増えた時だけ最下部へスクロール（ストリーミング中は除く）
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (messages.length > msgCountRef.current) {
+      msgCountRef.current = messages.length;
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length]);
 
   const handleSend = async (text: string) => {
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text };
