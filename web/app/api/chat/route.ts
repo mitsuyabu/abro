@@ -5,6 +5,39 @@ export const dynamic = "force-dynamic";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+async function fetchCityClimatePrompt(): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase
+      .from('city_climate')
+      .select('city,city_en,temp_avg_c,temp_summer_c,temp_winter_c,rainfall_mm,sunshine_hours,climate_type,koppen,summary')
+      .order('city_id');
+    if (!data || data.length === 0) return '';
+
+    type ClimateRow = {
+      city: string; city_en: string;
+      temp_avg_c: number | null; temp_summer_c: number | null; temp_winter_c: number | null;
+      rainfall_mm: number | null; sunshine_hours: number | null;
+      climate_type: string | null; koppen: string | null; summary: string | null;
+    };
+
+    const lines = (data as ClimateRow[]).map(c => [
+      `### ${c.city}（${c.city_en}）`,
+      `気候区分: ${c.climate_type ?? '未取得'}${c.koppen ? `（ケッペン: ${c.koppen}）` : ''}`,
+      `年間平均気温: ${c.temp_avg_c ?? '未取得'}°C / 夏の平均最高: ${c.temp_summer_c ?? '未取得'}°C / 冬の平均最低: ${c.temp_winter_c ?? '未取得'}°C`,
+      `年間降水量: ${c.rainfall_mm != null ? `${c.rainfall_mm}mm` : '未取得'} / 年間日照時間: ${c.sunshine_hours != null ? `${c.sunshine_hours}時間` : '未取得'}`,
+      c.summary ? `特徴: ${c.summary}` : '',
+    ].filter(Boolean).join('\n')).join('\n\n');
+
+    return `\n\n# 都市別気候データ（Wikipedia 2026年5月取得）\n気候・天気・季節に関する質問にはこのデータを使って具体的に案内してください。\n\n${lines}`;
+  } catch {
+    return '';
+  }
+}
+
 async function fetchCitySafetyPrompt(): Promise<string> {
   try {
     const supabase = createClient(
@@ -780,18 +813,19 @@ const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデー
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
-    const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt] = await Promise.all([
+    const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt, climatePrompt] = await Promise.all([
       fetchSchoolsPrompt(),
       fetchCostOfLivingPrompt(),
       fetchVisaInfoPrompt(),
       fetchCitySafetyPrompt(),
+      fetchCityClimatePrompt(),
     ]);
 
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2048,
       stream: true,
-      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt + costPrompt + visaPrompt + safetyPrompt }, ...messages],
+      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt + costPrompt + visaPrompt + safetyPrompt + climatePrompt }, ...messages],
     });
 
     const encoder = new TextEncoder();
