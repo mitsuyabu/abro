@@ -49,7 +49,7 @@ export default function BookingsPage() {
       <div className="flex-1 overflow-y-auto">
         {/* トップバー */}
         <div className="sticky top-0 bg-white border-b border-border z-10">
-          <div className="px-8 py-3 flex items-center gap-2 overflow-x-auto">
+          <div className="px-4 sm:px-6 py-3 flex items-center gap-2 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab}
@@ -64,7 +64,7 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        <div className="max-w-3xl mx-auto px-8 py-6">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
           {/* 提携サービス */}
           <section className="mb-8">
             <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">提携サービスから予約</h2>
@@ -134,8 +134,8 @@ export default function BookingsPage() {
         </div>
       </div>
 
-      {/* 右パネル */}
-      <div className="w-72 xl:w-80 border-l border-border flex-shrink-0 bg-background overflow-y-auto">
+      {/* 右パネル（lg以上のみ表示） */}
+      <div className="hidden lg:flex flex-col w-72 xl:w-80 border-l border-border flex-shrink-0 bg-background overflow-y-auto">
         <div className="h-12 border-b border-border flex items-center px-5 bg-white">
           <span className="text-xs font-semibold text-muted uppercase tracking-wide">費用サマリー</span>
         </div>

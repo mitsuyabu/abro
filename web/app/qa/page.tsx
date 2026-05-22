@@ -71,7 +71,7 @@ export default function QaPage() {
       <div className="flex-1 overflow-y-auto">
         {/* トップバー */}
         <div className="sticky top-0 bg-white border-b border-border z-10">
-          <div className="px-8 py-3 flex items-center gap-2 overflow-x-auto">
+          <div className="px-4 sm:px-6 py-3 flex items-center gap-2 overflow-x-auto">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
@@ -86,7 +86,7 @@ export default function QaPage() {
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto px-8 py-6 flex flex-col gap-4">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
           {/* 質問を投稿 */}
           <button className="bg-white border border-border rounded-2xl p-4 text-left hover:border-primary/30 transition-colors">
             <div className="flex items-center gap-3">
@@ -154,8 +154,8 @@ export default function QaPage() {
         </div>
       </div>
 
-      {/* 右パネル */}
-      <div className="w-72 xl:w-80 border-l border-border flex-shrink-0 bg-background overflow-y-auto">
+      {/* 右パネル（lg以上のみ表示） */}
+      <div className="hidden lg:flex flex-col w-72 xl:w-80 border-l border-border flex-shrink-0 bg-background overflow-y-auto">
         <div className="h-12 border-b border-border flex items-center px-5 bg-white">
           <span className="text-xs font-semibold text-muted uppercase tracking-wide">人気の質問</span>
         </div>

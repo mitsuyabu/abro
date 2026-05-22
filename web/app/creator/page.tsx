@@ -159,7 +159,7 @@ export default function CreatorPage() {
           {activeTab === 'hub' ? (
             <>
               {/* CTA */}
-              <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+              <div className="flex flex-col items-center justify-center py-12 sm:py-16 px-4 sm:px-8 text-center">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center mb-6 shadow-lg">
                   <span className="text-3xl text-white font-light">＋</span>
                 </div>
@@ -339,7 +339,7 @@ function GuideWizard({
         <div className="h-1 bg-gray-200">
           <div className="h-full bg-black transition-all duration-300" style={{ width: `${progressPct}%` }} />
         </div>
-        <div className="flex items-center justify-between px-8 py-4">
+        <div className="flex items-center justify-between px-4 sm:px-8 py-4">
           <button onClick={back} className="text-sm font-medium text-primary hover:opacity-60 transition-opacity">
             {step === 0 ? 'キャンセル' : '戻る'}
           </button>
@@ -576,7 +576,7 @@ function GuideEditor({
       </div>
 
       {/* タブ */}
-      <div className="border-b border-gray-100 px-8 flex-shrink-0">
+      <div className="border-b border-gray-100 px-4 sm:px-8 flex-shrink-0">
         <div className="flex gap-5">
           {(['overview', 'map'] as const).map(tab => (
             <button
@@ -594,7 +594,7 @@ function GuideEditor({
 
       {/* ボディ */}
       {activeTab === 'overview' ? (
-        <div className="max-w-2xl mx-auto px-8 py-8 w-full">
+        <div className="max-w-2xl mx-auto px-4 sm:px-8 py-6 sm:py-8 w-full">
           <textarea
             value={summary}
             onChange={e => setSummary(e.target.value)}
@@ -624,7 +624,7 @@ function GuideEditor({
           </div>
         </div>
       ) : (
-        <div className="max-w-2xl mx-auto px-8 py-8 w-full">
+        <div className="max-w-2xl mx-auto px-4 sm:px-8 py-6 sm:py-8 w-full">
           <h3 className="text-base font-bold text-primary mb-1">マップ</h3>
           {config.location && <p className="text-xs text-muted mb-4">📍 {config.location}</p>}
           <div className="w-full h-72 bg-gray-100 rounded-2xl overflow-hidden">

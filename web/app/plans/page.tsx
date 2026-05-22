@@ -55,7 +55,7 @@ export default function PlansPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-white">
-      <div className="max-w-5xl mx-auto px-6 sm:px-10 py-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10">
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-primary">あなたのプラン</h1>

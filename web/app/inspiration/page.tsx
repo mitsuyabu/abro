@@ -112,7 +112,7 @@ export default function InspirationPage() {
 
   return (
     <div className="h-full overflow-y-auto bg-white">
-      <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <h1 className="text-2xl font-bold text-primary mb-1">インスピレーション</h1>
         <p className="text-muted text-sm mb-6">先輩たちのリアルな体験談・ガイドを参考にしよう</p>
 
@@ -163,7 +163,7 @@ export default function InspirationPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-x-4 gap-y-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 sm:gap-x-4 gap-y-6 sm:gap-y-8">
             {/* プランカード */}
             {filteredPlans.map(plan => (
               <PlanCard key={`plan-${plan.id}`} plan={plan} />
