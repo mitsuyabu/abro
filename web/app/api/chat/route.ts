@@ -5,6 +5,46 @@ export const dynamic = "force-dynamic";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+async function fetchCityJobsPrompt(): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase
+      .from('city_jobs')
+      .select('city,city_en,indeed_casual_count,score_jobs,score_japanese_jobs,peak_season,farm_nearby,dominant_job_types,summary_ja,hospitality_level,japanese_biz_level')
+      .order('score_jobs', { ascending: false });
+    if (!data || data.length === 0) return '';
+
+    type JobRow = {
+      city: string; city_en: string;
+      indeed_casual_count: number | null;
+      score_jobs: number | null; score_japanese_jobs: number | null;
+      peak_season: string | null; farm_nearby: boolean | null;
+      dominant_job_types: string | null; summary_ja: string | null;
+      hospitality_level: string | null; japanese_biz_level: string | null;
+    };
+
+    const lvl = (v: string | null) => v === 'H' ? '多い' : v === 'M' ? '中程度' : v === 'L' ? '少ない' : '未取得';
+
+    const lines = (data as JobRow[]).map(c => [
+      `### ${c.city}（${c.city_en}）`,
+      `仕事スコア: ${c.score_jobs ?? '—'}/5 / 日本語求人スコア: ${c.score_japanese_jobs ?? '—'}/5`,
+      `Indeedカジュアル求人: 約${c.indeed_casual_count != null ? c.indeed_casual_count.toLocaleString() : '—'}件`,
+      `ホスピタリティ求人: ${lvl(c.hospitality_level)} / 日本語対応職場: ${lvl(c.japanese_biz_level)}`,
+      c.farm_nearby ? 'ファーム作業（88日条件）: 近郊あり' : '',
+      c.peak_season ? `求人ピーク: ${c.peak_season}` : '',
+      c.dominant_job_types ? `主な職種: ${c.dominant_job_types}` : '',
+      c.summary_ja ? `特徴: ${c.summary_ja}` : '',
+    ].filter(Boolean).join('\n')).join('\n\n');
+
+    return `\n\n# 都市別仕事市場データ（Indeed 2026年5月実測 + 労働市場調査）\n仕事・求人・働き方に関する質問にはこのデータを使って具体的に案内してください。データはIndeed実測値をベースにしており、Seek・Gumtree等のデータは含まれないため実際の総数はさらに多い可能性があります。\n\n${lines}`;
+  } catch {
+    return '';
+  }
+}
+
 async function fetchCityClimatePrompt(): Promise<string> {
   try {
     const supabase = createClient(
@@ -813,19 +853,20 @@ const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデー
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
-    const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt, climatePrompt] = await Promise.all([
+    const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt, climatePrompt, jobsPrompt] = await Promise.all([
       fetchSchoolsPrompt(),
       fetchCostOfLivingPrompt(),
       fetchVisaInfoPrompt(),
       fetchCitySafetyPrompt(),
       fetchCityClimatePrompt(),
+      fetchCityJobsPrompt(),
     ]);
 
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2048,
       stream: true,
-      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt + costPrompt + visaPrompt + safetyPrompt + climatePrompt }, ...messages],
+      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt + costPrompt + visaPrompt + safetyPrompt + climatePrompt + jobsPrompt }, ...messages],
     });
 
     const encoder = new TextEncoder();

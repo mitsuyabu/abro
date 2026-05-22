@@ -22,6 +22,15 @@ type CityClimate = {
   summary: string | null;
 };
 
+type CityJobs = {
+  city_id: string;
+  indeed_casual_count: number | null;
+  score_jobs: number | null;
+  score_japanese_jobs: number | null;
+  farm_nearby: boolean | null;
+  dominant_job_types: string | null;
+};
+
 type CitySafety = {
   city: string;
   safety_index: number | null;
@@ -39,7 +48,7 @@ const CITY_COVER: Record<string, string> = {
   perth:        '/images/cities/perth.jpg',
 };
 
-const SCORE_LABELS = [
+const CLIMATE_SCORE_LABELS = [
   { key: 'score_heat',     label: '暑さ',       icon: '☀️' },
   { key: 'score_cold',     label: '寒さ',       icon: '❄️' },
   { key: 'score_rain',     label: '雨の多さ',   icon: '🌧️' },
@@ -63,6 +72,7 @@ type Tab = 'cards' | 'compare';
 export default function CitiesPage() {
   const [cities, setCities] = useState<CityClimate[]>([]);
   const [safetyMap, setSafetyMap] = useState<Record<string, CitySafety>>({});
+  const [jobsMap, setJobsMap] = useState<Record<string, CityJobs>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('cards');
   const [selected, setSelected] = useState<Set<string>>(new Set(['sydney', 'melbourne', 'brisbane']));
@@ -72,13 +82,15 @@ export default function CitiesPage() {
     Promise.all([
       supabase.from('city_climate').select('*').order('city_id'),
       supabase.from('city_safety').select('city, safety_index, crime_index, safety_daytime, safety_nighttime').order('city'),
-    ]).then(([climateRes, safetyRes]) => {
+      supabase.from('city_jobs').select('city_id, indeed_casual_count, score_jobs, score_japanese_jobs, farm_nearby, dominant_job_types').order('city_id'),
+    ]).then(([climateRes, safetyRes, jobsRes]) => {
       setCities((climateRes.data ?? []) as CityClimate[]);
-      const map: Record<string, CitySafety> = {};
-      for (const s of (safetyRes.data ?? []) as CitySafety[]) {
-        map[s.city] = s;
-      }
-      setSafetyMap(map);
+      const smap: Record<string, CitySafety> = {};
+      for (const s of (safetyRes.data ?? []) as CitySafety[]) smap[s.city] = s;
+      setSafetyMap(smap);
+      const jmap: Record<string, CityJobs> = {};
+      for (const j of (jobsRes.data ?? []) as CityJobs[]) jmap[j.city_id] = j;
+      setJobsMap(jmap);
       setLoading(false);
     });
   }, []);
@@ -168,7 +180,7 @@ export default function CitiesPage() {
 
                   {/* 気候スコア */}
                   <div className="px-4 py-3 flex flex-col gap-1.5">
-                    {SCORE_LABELS.map(({ key, label, icon }) => (
+                    {CLIMATE_SCORE_LABELS.map(({ key, label, icon }) => (
                       <div key={key} className="flex items-center gap-2">
                         <span className="text-sm w-4 text-center leading-none">{icon}</span>
                         <span className="text-xs text-muted w-16 shrink-0">{label}</span>
@@ -176,6 +188,28 @@ export default function CitiesPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* 仕事スコア */}
+                  {(() => {
+                    const jobs = jobsMap[c.city_id];
+                    return jobs ? (
+                      <div className="px-4 pb-2 border-t border-border pt-2.5 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm w-4 text-center leading-none">💼</span>
+                          <span className="text-xs text-muted w-16 shrink-0">仕事の多さ</span>
+                          <Stars score={jobs.score_jobs} />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm w-4 text-center leading-none">🇯🇵</span>
+                          <span className="text-xs text-muted w-16 shrink-0">日本語求人</span>
+                          <Stars score={jobs.score_japanese_jobs} />
+                        </div>
+                        {jobs.farm_nearby && (
+                          <p className="text-[10px] text-green-600 font-medium ml-6">✓ 近郊にファーム作業あり（88日対応）</p>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
 
                   {/* 治安 */}
                   {safety && (
@@ -298,6 +332,52 @@ export default function CitiesPage() {
                           {c.sunshine_hours != null ? `${c.sunshine_hours}h` : '—'}
                         </td>
                       ))}
+                    </tr>
+
+                    {/* 仕事行 */}
+                    <tr className="border-b border-border hover:bg-gray-50 transition-colors bg-green-50/30">
+                      <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">💼 仕事の多さ</td>
+                      {compareCities.map(c => {
+                        const jobs = jobsMap[c.city_id];
+                        return (
+                          <td key={c.city_id} className="text-center px-3 py-2.5">
+                            <Stars score={jobs?.score_jobs ?? null} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr className="border-b border-border hover:bg-gray-50 transition-colors bg-green-50/30">
+                      <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">🇯🇵 日本語求人</td>
+                      {compareCities.map(c => {
+                        const jobs = jobsMap[c.city_id];
+                        return (
+                          <td key={c.city_id} className="text-center px-3 py-2.5">
+                            <Stars score={jobs?.score_japanese_jobs ?? null} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr className="border-b border-border hover:bg-gray-50 transition-colors bg-green-50/30">
+                      <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">📊 Indeed件数</td>
+                      {compareCities.map(c => {
+                        const jobs = jobsMap[c.city_id];
+                        return (
+                          <td key={c.city_id} className="text-center px-3 py-2.5 text-xs font-medium">
+                            {jobs?.indeed_casual_count != null ? `約${jobs.indeed_casual_count.toLocaleString()}件` : '—'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr className="border-b border-border hover:bg-gray-50 transition-colors bg-green-50/30">
+                      <td className="px-4 py-2.5 text-xs text-muted whitespace-nowrap">🌾 ファーム作業</td>
+                      {compareCities.map(c => {
+                        const jobs = jobsMap[c.city_id];
+                        return (
+                          <td key={c.city_id} className="text-center px-3 py-2.5 text-xs">
+                            {jobs?.farm_nearby ? <span className="text-green-600 font-bold">近郊あり</span> : <span className="text-muted">—</span>}
+                          </td>
+                        );
+                      })}
                     </tr>
 
                     {/* 治安行 */}
