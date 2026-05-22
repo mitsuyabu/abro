@@ -5,6 +5,130 @@ export const dynamic = "force-dynamic";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+async function fetchCitySafetyPrompt(): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase
+      .from('city_safety')
+      .select('city,city_en,safety_index,crime_index,safety_daytime,safety_nighttime,problem_drugs,problem_property_crime,problem_violent_crime,crime_increasing_5yr,summary_ja,notes')
+      .order('safety_index', { ascending: false });
+    if (!data || data.length === 0) return '';
+
+    type SafetyRow = {
+      city: string; city_en: string;
+      safety_index: number | null; crime_index: number | null;
+      safety_daytime: number | null; safety_nighttime: number | null;
+      problem_drugs: number | null; problem_property_crime: number | null;
+      problem_violent_crime: number | null; crime_increasing_5yr: number | null;
+      summary_ja: string | null; notes: string | null;
+    };
+
+    const level = (v: number | null) => {
+      if (v == null) return '未取得';
+      if (v >= 60) return `${v}（高）`;
+      if (v >= 35) return `${v}（中）`;
+      return `${v}（低）`;
+    };
+
+    const lines = (data as SafetyRow[]).map(c => [
+      `### ${c.city}（${c.city_en}）`,
+      `安全指数: ${c.safety_index ?? '未取得'} / 犯罪指数: ${c.crime_index ?? '未取得'}`,
+      `昼間の安全感: ${level(c.safety_daytime)} / 夜間の安全感: ${level(c.safety_nighttime)}`,
+      `薬物問題: ${level(c.problem_drugs)} / 物品犯罪: ${level(c.problem_property_crime)} / 暴力犯罪: ${level(c.problem_violent_crime)}`,
+      `近年の犯罪増加感: ${level(c.crime_increasing_5yr)}`,
+      c.summary_ja ? `概要: ${c.summary_ja}` : '',
+      c.notes ? `備考: ${c.notes}` : '',
+    ].filter(Boolean).join('\n')).join('\n\n');
+
+    return `\n\n# 都市別治安データ（Numbeo 2026年4〜5月取得）\n治安・安全性に関する質問にはこのデータを使って具体的に案内してください。スコアは0〜100で、安全指数は高いほど安全、犯罪指数は高いほど危険です。\n\n${lines}`;
+  } catch {
+    return '';
+  }
+}
+
+async function fetchVisaInfoPrompt(): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase
+      .from('visa_info')
+      .select('visa_code,visa_name_ja,visa_name_en,target_user_ja,age_restriction,stay_duration,work_restriction,application_fee_aud,required_documents,application_method,second_third_info,notes')
+      .order('visa_code');
+    if (!data || data.length === 0) return '';
+
+    type VisaRow = {
+      visa_code: string;
+      visa_name_ja: string;
+      visa_name_en: string;
+      target_user_ja: string | null;
+      age_restriction: string | null;
+      stay_duration: string | null;
+      work_restriction: string | null;
+      application_fee_aud: number | null;
+      required_documents: string | null;
+      application_method: string | null;
+      second_third_info: string | null;
+      notes: string | null;
+    };
+
+    const lines = (data as VisaRow[]).map(v => [
+      `### ${v.visa_name_ja}（${v.visa_name_en} / サブクラス${v.visa_code}）`,
+      v.target_user_ja ? `対象者: ${v.target_user_ja}` : '',
+      v.age_restriction ? `年齢制限: ${v.age_restriction}` : '',
+      v.stay_duration ? `滞在期間: ${v.stay_duration}` : '',
+      v.work_restriction ? `就労制限: ${v.work_restriction}` : '',
+      v.application_fee_aud != null ? `申請費用: A$${v.application_fee_aud}（約${Math.round(v.application_fee_aud * 95).toLocaleString()}円）` : '',
+      v.required_documents ? `必要書類: ${v.required_documents}` : '',
+      v.application_method ? `申請方法: ${v.application_method}` : '',
+      v.second_third_info ? `セカンド・サード条件: ${v.second_third_info}` : '',
+      v.notes ? `注意点: ${v.notes}` : '',
+    ].filter(Boolean).join('\n')).join('\n\n');
+
+    return `\n\n# オーストラリア ビザ情報（2026年5月時点）\nビザに関する質問にはこのデータを使って正確に案内してください。費用・条件は変更される場合があるため「目安」として案内し、最新情報は公式サイトで確認するよう伝えてください。\n\n${lines}`;
+  } catch {
+    return '';
+  }
+}
+
+async function fetchCostOfLivingPrompt(): Promise<string> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data } = await supabase
+      .from('city_cost_of_living')
+      .select('city,city_en,meal_cheap_aud,meal_midrange_2p_aud,meal_fastfood_aud,coffee_aud,beer_local_aud,milk_1l_aud,eggs_12_aud,chicken_1kg_aud,beef_1kg_aud,rice_1kg_aud,tomato_1kg_aud,apple_1kg_aud,rent_1br_city_aud,rent_1br_suburbs_aud,rent_3br_city_aud,rent_3br_suburbs_aud,transport_one_way_aud,transport_monthly_aud,gas_per_liter_aud,taxi_start_aud,utilities_85sqm_aud,mobile_plan_aud,internet_aud,gym_monthly_aud,movie_ticket_aud,avg_monthly_salary_aud,notes')
+      .order('city');
+    if (!data || data.length === 0) return '';
+
+    const JPY = 95;
+    const f = (v: number | null, suffix = '') =>
+      v != null ? `A$${v}（約${Math.round(v * JPY).toLocaleString()}円）${suffix}` : '未取得';
+
+    const lines = (data as Array<Record<string, number | string | null>>).map(c => [
+      `### ${c.city}（${c.city_en}）`,
+      `外食: 安いレストラン ${f(c.meal_cheap_aud as number | null)} / 中級2人 ${f(c.meal_midrange_2p_aud as number | null)} / ファーストフード ${f(c.meal_fastfood_aud as number | null)} / カフェ ${f(c.coffee_aud as number | null)} / ビール ${f(c.beer_local_aud as number | null)}`,
+      `食料品: 牛乳1L ${f(c.milk_1l_aud as number | null)} / 卵12個 ${f(c.eggs_12_aud as number | null)} / 鶏肉1kg ${f(c.chicken_1kg_aud as number | null)} / 牛肉1kg ${f(c.beef_1kg_aud as number | null)} / 米1kg ${f(c.rice_1kg_aud as number | null)}`,
+      `家賃/月: 1BR市街地 ${f(c.rent_1br_city_aud as number | null, '/月')} / 1BR郊外 ${f(c.rent_1br_suburbs_aud as number | null, '/月')} / 3BR市街地 ${f(c.rent_3br_city_aud as number | null, '/月')} / 3BR郊外 ${f(c.rent_3br_suburbs_aud as number | null, '/月')}`,
+      `交通: 片道 ${f(c.transport_one_way_aud as number | null)} / 月間パス ${f(c.transport_monthly_aud as number | null, '/月')} / ガソリン1L ${f(c.gas_per_liter_aud as number | null)} / タクシー初乗り ${f(c.taxi_start_aud as number | null)}`,
+      `光熱費・通信/月: 電気ガス水道（85㎡） ${f(c.utilities_85sqm_aud as number | null, '/月')} / スマホ ${f(c.mobile_plan_aud as number | null, '/月')} / ネット ${f(c.internet_aud as number | null, '/月')}`,
+      `娯楽: ジム ${f(c.gym_monthly_aud as number | null, '/月')} / 映画 ${f(c.movie_ticket_aud as number | null)}`,
+      `平均月収（税引後）: ${f(c.avg_monthly_salary_aud as number | null, '/月')}`,
+      c.notes ? `備考: ${c.notes}` : '',
+    ].filter(Boolean).join('\n')).join('\n\n');
+
+    return `\n\n# 都市別生活費データ（Numbeo 2026年5月取得、1AUD≈95円）\n費用シミュレーションや都市比較の質問には、必ず以下の実データを使って具体的な金額をAUDと日本円の両方で案内してください。\n\n${lines}`;
+  } catch {
+    return '';
+  }
+}
+
 async function fetchSchoolsPrompt(): Promise<string> {
   try {
     const supabase = createClient(
@@ -656,13 +780,18 @@ const SYSTEM_PROMPT = `あなたはAbroのAI留学・ワーキングホリデー
 export async function POST(req: Request) {
   try {
     const { messages } = await req.json();
-    const schoolsPrompt = await fetchSchoolsPrompt();
+    const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt] = await Promise.all([
+      fetchSchoolsPrompt(),
+      fetchCostOfLivingPrompt(),
+      fetchVisaInfoPrompt(),
+      fetchCitySafetyPrompt(),
+    ]);
 
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
       max_tokens: 2048,
       stream: true,
-      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt }, ...messages],
+      messages: [{ role: "system", content: SYSTEM_PROMPT + schoolsPrompt + costPrompt + visaPrompt + safetyPrompt }, ...messages],
     });
 
     const encoder = new TextEncoder();
