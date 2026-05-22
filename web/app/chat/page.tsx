@@ -36,12 +36,15 @@ interface GeneratedPlan {
   timeline: { period: string; tasks: string[] }[];
 }
 
+type QuickSelectType = 'school-duration' | 'stay-duration' | 'month' | null;
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   context?: SidebarContext;
   planData?: { id: string; plan: GeneratedPlan };
+  quickSelect?: QuickSelectType;
 }
 
 function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text: string) => void }) {
@@ -121,6 +124,61 @@ function InlineSchoolCards({ schools, onSelectSchool }: { schools: SchoolItem[];
   );
 }
 
+function QuickSelectDuration({ type, onSend }: { type: 'school-duration' | 'stay-duration'; onSend: (text: string) => void }) {
+  const schoolOptions = ['〜1ヶ月', '2〜3ヶ月', '4〜6ヶ月', '6ヶ月以上', '決まっていない'];
+  const stayOptions = ['〜1ヶ月', '〜3ヶ月', '〜6ヶ月', '〜1年', '1年以上', '決まっていない'];
+  const options = type === 'school-duration' ? schoolOptions : stayOptions;
+  const label = type === 'school-duration' ? '学校に通う期間を選んでください' : '滞在期間を選んでください';
+  const prefix = type === 'school-duration' ? '語学学校に通う期間は' : '滞在期間は';
+
+  return (
+    <div className="mt-2 pl-9 sm:pl-11">
+      <p className="text-[11px] text-muted mb-2">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map(opt => (
+          <button
+            key={opt}
+            onClick={() => onSend(`${prefix}${opt}です`)}
+            className="px-4 py-2 rounded-full border border-border text-sm text-primary hover:border-primary hover:bg-primary/5 transition-all"
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function QuickSelectMonth({ onSend }: { onSend: (text: string) => void }) {
+  const now = new Date();
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    return {
+      label: `${d.getMonth() + 1}月`,
+      year: d.getFullYear(),
+      text: `${d.getFullYear()}年${d.getMonth() + 1}月頃に行きたいです`,
+    };
+  });
+
+  return (
+    <div className="mt-2 pl-9 sm:pl-11">
+      <p className="text-[11px] text-muted mb-2">出発予定月を選んでください</p>
+      <div className="grid grid-cols-4 gap-2 max-w-xs">
+        {months.map((m, i) => (
+          <button
+            key={i}
+            onClick={() => onSend(m.text)}
+            className="flex flex-col items-center py-2 px-1 rounded-xl border border-border text-primary hover:border-primary hover:bg-primary/5 transition-all"
+          >
+            <span className="text-sm font-semibold">{m.label}</span>
+            <span className="text-[10px] text-muted">{m.year}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // 推薦・フォーカスを示すパターン
 const CITY_FOCUS_PATTERNS = [
   'がおすすめ', 'をおすすめ', 'をご提案', 'をご紹介', 'が候補', 'を候補',
@@ -186,6 +244,17 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
   const schools = [...merged.values()];
 
   return { cities, countries, schools, showAgents };
+}
+
+function detectQuickSelect(content: string): QuickSelectType {
+  const schoolPatterns = ['学校に通う期間', '語学学校の期間', '通う期間', '何ヶ月通', '就学期間'];
+  const stayPatterns = ['滞在期間', 'どのくらい滞在', '何ヶ月滞在', '留学期間', 'ワーホリ期間', '何ヶ月くらいいる', '何ヶ月くらい過ごす'];
+  const monthPatterns = ['いつ頃', '何月', '出発時期', '行く時期', '渡航時期', '何月ごろ', 'いつ出発', '何月から', '何月に'];
+
+  if (schoolPatterns.some(p => content.includes(p))) return 'school-duration';
+  if (stayPatterns.some(p => content.includes(p))) return 'stay-duration';
+  if (monthPatterns.some(p => content.includes(p))) return 'month';
+  return null;
 }
 
 function parseChoices(content: string): string[] {
@@ -342,8 +411,9 @@ export default function ChatPage() {
       }
 
       const ctx = detectSidebarContext(fullContent, text, allSchools);
+      const quickSelect = detectQuickSelect(fullContent);
       setSidebarContext(ctx);
-      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx } : m));
+      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx, quickSelect } : m));
 
       // 渡航情報を非同期抽出（チャットをブロックしない）
       const extractMsgs = [...newMessages, { role: 'assistant', content: fullContent }];
@@ -496,6 +566,14 @@ export default function ChatPage() {
                           />
                         )}
                       </div>
+                    )
+                  )}
+                  {/* クイック選択UI（期間・月） */}
+                  {msg.role === 'assistant' && msg.quickSelect && !msg.planData && (
+                    msg.quickSelect === 'month' ? (
+                      <QuickSelectMonth onSend={handleSend} />
+                    ) : (
+                      <QuickSelectDuration type={msg.quickSelect} onSend={handleSend} />
                     )
                   )}
                 </div>
