@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
-import { CostSimulator } from '@/components/chat/CostSimulator';
+import { CostSimulator, type ChatSync } from '@/components/chat/CostSimulator';
 import { AgentContactModal } from '@/components/AgentContactModal';
 import { getInitialState, advancePhase, type ConversationState } from '@/utils/conversationManager';
 
@@ -571,6 +571,36 @@ export default function ChatPage() {
   const latestAI = messages.filter(m => m.role === 'assistant').at(-1)?.content ?? '';
   const suggestions = isEmpty ? DEFAULT_SUGGESTIONS : getContextSuggestions(sidebarContext, latestAI);
 
+  // チャット内容からシミュレーター連動データを抽出
+  const chatSyncData = useMemo((): ChatSync => {
+    // 都市：会話状態から提案都市
+    const city = conversationState.proposedCity;
+
+    // 滞在期間：直近ユーザーメッセージから抽出
+    let totalWeeks: number | null = null;
+    const recentUser = messages.filter(m => m.role === 'user').slice(-5).map(m => m.content).join(' ');
+    if (/1年|１年/.test(recentUser)) {
+      totalWeeks = 52;
+    } else if (/半年|6ヶ月|6カ月|６ヶ月/.test(recentUser)) {
+      totalWeeks = 26;
+    } else {
+      const mMatch = recentUser.match(/(\d+)\s*ヶ月/);
+      if (mMatch) totalWeeks = Math.min(52, Math.max(4, Math.round(parseInt(mMatch[1]) * 4.3)));
+    }
+
+    // 語学学校週数：最新AI返答から抽出
+    let schoolWeeks: number | null = null;
+    if (latestAI) {
+      const sMatch = latestAI.match(/(\d+)\s*週間?.*?(?:語学学校|学校)|(?:語学学校|学校).*?(\d+)\s*週間?/);
+      if (sMatch) {
+        const w = parseInt(sMatch[1] ?? sMatch[2] ?? '0');
+        if (w >= 1 && w <= 52) schoolWeeks = w;
+      }
+    }
+
+    return { city, totalWeeks, schoolWeeks };
+  }, [conversationState.proposedCity, messages, latestAI]);
+
   const sidebarLabel =
     sidebarContext.showAgents ? 'エージェント' :
     sidebarContext.schools.length > 0 ? '語学学校' :
@@ -794,7 +824,7 @@ export default function ChatPage() {
       {/* デスクトップ固定右パネル */}
       <div className="hidden lg:flex w-96 xl:w-[420px] border-l border-border bg-background flex-shrink-0 flex-col h-full overflow-hidden">
         {showCostSimulator ? (
-          <CostSimulator onClose={() => setShowCostSimulator(false)} />
+          <CostSimulator onClose={() => setShowCostSimulator(false)} chatSync={chatSyncData} />
         ) : (
           <>
             <div className="h-12 border-b border-border flex items-center px-5 bg-white flex-shrink-0">
@@ -821,7 +851,7 @@ export default function ChatPage() {
       {/* モバイル：費用シミュレーターオーバーレイ */}
       {showCostSimulator && (
         <div className="lg:hidden fixed inset-0 z-50 bg-white flex flex-col">
-          <CostSimulator onClose={() => setShowCostSimulator(false)} />
+          <CostSimulator onClose={() => setShowCostSimulator(false)} chatSync={chatSyncData} />
         </div>
       )}
 
