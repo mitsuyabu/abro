@@ -576,22 +576,33 @@ export default function ChatPage() {
     // 都市：会話状態から提案都市
     const city = conversationState.proposedCity;
 
-    // 滞在期間：直近ユーザーメッセージから抽出
+    // 全角数字→半角に正規化
+    const toHalf = (s: string) =>
+      s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30));
+
+    // 滞在期間：直近のユーザー＋AI両方のメッセージから抽出（全角対応）
     let totalWeeks: number | null = null;
-    const recentUser = messages.filter(m => m.role === 'user').slice(-5).map(m => m.content).join(' ');
-    if (/1年|１年/.test(recentUser)) {
+    const recentAll = messages.slice(-8).map(m => toHalf(m.content)).join(' ');
+    if (/1年|１年/.test(recentAll)) {
       totalWeeks = 52;
-    } else if (/半年|6ヶ月|6カ月|６ヶ月/.test(recentUser)) {
+    } else if (/半年|6ヶ月|6か月|6カ月|6ヵ月/.test(recentAll)) {
       totalWeeks = 26;
     } else {
-      const mMatch = recentUser.match(/(\d+)\s*ヶ月/);
-      if (mMatch) totalWeeks = Math.min(52, Math.max(4, Math.round(parseInt(mMatch[1]) * 4.3)));
+      // "3ヶ月" "3か月" "3カ月" "3ヵ月" "3箇月" に対応
+      const mMatch = recentAll.match(/(\d+)\s*(?:ヶ月|か月|カ月|ヵ月|箇月)/);
+      if (mMatch) {
+        const months = parseInt(mMatch[1]);
+        // slider の step=2 に合わせて偶数に丸める
+        const raw = Math.round(months * 4.3);
+        totalWeeks = Math.min(52, Math.max(4, Math.round(raw / 2) * 2));
+      }
     }
 
-    // 語学学校週数：最新AI返答から抽出
+    // 語学学校週数：最新AI返答から抽出（全角対応）
     let schoolWeeks: number | null = null;
     if (latestAI) {
-      const sMatch = latestAI.match(/(\d+)\s*週間?.*?(?:語学学校|学校)|(?:語学学校|学校).*?(\d+)\s*週間?/);
+      const halfAI = toHalf(latestAI);
+      const sMatch = halfAI.match(/(\d+)\s*週間?.*?(?:語学学校|学校)|(?:語学学校|学校).*?(\d+)\s*週間?/);
       if (sMatch) {
         const w = parseInt(sMatch[1] ?? sMatch[2] ?? '0');
         if (w >= 1 && w <= 52) schoolWeeks = w;
