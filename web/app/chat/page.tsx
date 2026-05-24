@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
+import { CostSimulator } from '@/components/chat/CostSimulator';
 import { AgentContactModal } from '@/components/AgentContactModal';
 import { getInitialState, advancePhase, type ConversationState } from '@/utils/conversationManager';
 
@@ -369,6 +370,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [showCostSimulator, setShowCostSimulator] = useState(false);
   const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
@@ -617,7 +619,13 @@ export default function ChatPage() {
                 {ACTION_CHIPS.map(chip => (
                   <button
                     key={chip.id}
-                    onClick={() => handleSend(chip.prompt)}
+                    onClick={() => {
+                      if (chip.id === 'cost') {
+                        setShowCostSimulator(true);
+                      } else {
+                        handleSend(chip.prompt);
+                      }
+                    }}
                     className="bg-white border border-border rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 text-left hover:border-primary/40 hover:shadow-sm transition-all flex items-center gap-2 sm:gap-3"
                   >
                     <span className="text-lg sm:text-xl flex-shrink-0">{chip.emoji}</span>
@@ -785,16 +793,22 @@ export default function ChatPage() {
 
       {/* デスクトップ固定右パネル */}
       <div className="hidden lg:flex w-96 xl:w-[420px] border-l border-border bg-background flex-shrink-0 flex-col h-full overflow-hidden">
-        <div className="h-12 border-b border-border flex items-center px-5 bg-white flex-shrink-0">
-          <span className="text-xs font-semibold text-muted uppercase tracking-wide">{sidebarLabel}</span>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <DynamicSidebar
-            context={sidebarContext}
-            focusedSchool={sidebarFocusedSchool}
-            onFocusedSchoolChange={setSidebarFocusedSchool}
-          />
-        </div>
+        {showCostSimulator ? (
+          <CostSimulator onClose={() => setShowCostSimulator(false)} />
+        ) : (
+          <>
+            <div className="h-12 border-b border-border flex items-center px-5 bg-white flex-shrink-0">
+              <span className="text-xs font-semibold text-muted uppercase tracking-wide">{sidebarLabel}</span>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <DynamicSidebar
+                context={sidebarContext}
+                focusedSchool={sidebarFocusedSchool}
+                onFocusedSchoolChange={setSidebarFocusedSchool}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* エージェント相談モーダル */}
@@ -803,6 +817,13 @@ export default function ChatPage() {
         onClose={() => setShowAgentModal(false)}
         context={messages.length > 0 ? messages.filter(m => m.role === 'user').slice(-3).map(m => m.content).join('、') : undefined}
       />
+
+      {/* モバイル：費用シミュレーターオーバーレイ */}
+      {showCostSimulator && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-white flex flex-col">
+          <CostSimulator onClose={() => setShowCostSimulator(false)} />
+        </div>
+      )}
 
       {/* モバイル：全画面マップオーバーレイ */}
       {showMapView && (
