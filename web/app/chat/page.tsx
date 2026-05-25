@@ -25,6 +25,54 @@ const DEFAULT_SUGGESTIONS = [
   '何から始めればいい？',
 ];
 
+const SCHOOL_PREF_OPTIONS = [
+  { id: 'cheap',   label: 'コスパ重視',      emoji: '💰', prompt: 'コスパが良く学費が安い' },
+  { id: 'small',   label: '少人数クラス',     emoji: '👥', prompt: '少人数クラスで丁寧に教えてくれる' },
+  { id: 'career',  label: '就職サポート',     emoji: '💼', prompt: '就職・キャリアサポートが充実している' },
+  { id: 'fewJP',   label: '日本人が少ない',   emoji: '🌏', prompt: '日本人が少なく英語漬けになれる' },
+  { id: 'beach',   label: '観光地・海近く',   emoji: '🏖️', prompt: 'ビーチや観光地の近くにある' },
+  { id: 'popular', label: '人気・評判がいい', emoji: '⭐', prompt: '評判が良く人気がある' },
+] as const;
+
+function SchoolPreferenceChips({
+  selected,
+  onToggle,
+  onSearch,
+}: {
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onSearch: () => void;
+}) {
+  return (
+    <div className="bg-gray-50 border border-border/60 rounded-2xl px-3 py-3 max-w-md">
+      <p className="text-[11px] font-semibold text-muted mb-2">どんな学校を探していますか？（複数選択可）</p>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {SCHOOL_PREF_OPTIONS.map(p => (
+          <button
+            key={p.id}
+            onClick={() => onToggle(p.id)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+              selected.has(p.id)
+                ? 'bg-primary text-white border-primary'
+                : 'bg-white text-primary border-border hover:border-primary/50 hover:bg-primary/5'
+            }`}
+          >
+            <span>{p.emoji}</span>
+            <span>{p.label}</span>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={onSearch}
+        disabled={selected.size === 0}
+        className="w-full bg-primary text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40 hover:opacity-80 transition-all disabled:cursor-not-allowed"
+      >
+        {selected.size === 0 ? '条件を選んで学校を探す' : `選んだ条件（${selected.size}個）で学校を探す →`}
+      </button>
+    </div>
+  );
+}
+
 interface GeneratedPlan {
   title: string;
   destination_country: string;
@@ -510,6 +558,9 @@ export default function ChatPage() {
   const [conversationState, setConversationState] = useState<ConversationState>(getInitialState());
   const [chatLoaded, setChatLoaded] = useState(false);
 
+  // 学校絞り込み条件
+  const [schoolPreferences, setSchoolPreferences] = useState<Set<string>>(new Set());
+
   // セッション管理
   const sessionIdRef = useRef<string>(generateId());
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -619,6 +670,25 @@ export default function ChatPage() {
       setSessions(lsGetSessions()); // 開く前に最新を取得
     }
     setShowSessionDropdown(v => !v);
+  };
+
+  const toggleSchoolPreference = (id: string) => {
+    setSchoolPreferences(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSchoolPreferenceSearch = () => {
+    if (schoolPreferences.size === 0) return;
+    const conditions = SCHOOL_PREF_OPTIONS
+      .filter(p => schoolPreferences.has(p.id))
+      .map(p => p.prompt)
+      .join('、');
+    const cityPrefix = conversationState.proposedCity ? `${conversationState.proposedCity}で` : '';
+    handleSend(`${cityPrefix}${conditions}語学学校を具体的に教えてください`);
+    setSchoolPreferences(new Set());
   };
 
   // ドロップダウン外クリックで閉じる
@@ -773,8 +843,6 @@ export default function ChatPage() {
 
   // チャット内容からシミュレーター連動データを抽出
   const chatSyncData = useMemo((): ChatSync => {
-    const city = conversationState.proposedCity;
-
     const toHalf = (s: string) =>
       s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30));
 
@@ -791,9 +859,27 @@ export default function ChatPage() {
       return null;
     };
 
-    // ユーザーメッセージのみ走査（AIの「最大1年のビザ」等の誤検知を防ぐ）
-    let totalWeeks: number | null = null;
     const userMessages = messages.filter(m => m.role === 'user');
+
+    // 都市：proposedCity → ユーザーメッセージ走査 → AI返答（2回以上言及）の順で検索
+    const SYNC_CITIES = ['シドニー', 'メルボルン', 'ブリスベン', 'ゴールドコースト', 'ケアンズ', 'パース'];
+    let city: string | null = conversationState.proposedCity ?? null;
+    if (!city) {
+      outer:
+      for (const msg of [...userMessages].reverse().slice(0, 5)) {
+        for (const c of SYNC_CITIES) {
+          if (msg.content.includes(c)) { city = c; break outer; }
+        }
+      }
+    }
+    if (!city && latestAI) {
+      for (const c of SYNC_CITIES) {
+        if ((latestAI.match(new RegExp(c, 'g')) || []).length >= 2) { city = c; break; }
+      }
+    }
+
+    // 滞在期間：ユーザーメッセージのみ走査（AIの「最大1年のビザ」等の誤検知を防ぐ）
+    let totalWeeks: number | null = null;
     for (const msg of [...userMessages].reverse().slice(0, 5)) {
       const w = extractWeeks(msg.content);
       if (w !== null) { totalWeeks = w; break; }
@@ -828,6 +914,11 @@ export default function ChatPage() {
   const currentSessionTitle = messages.length > 0
     ? (messages.find(m => m.role === 'user')?.content.trim().slice(0, 25) ?? '新しいチャット')
     : '新しいチャット';
+
+  // 学校を含む最後のAIメッセージID（絞り込みチップをそこだけ表示するため）
+  const lastSchoolMsgId = messages
+    .filter(m => m.role === 'assistant' && (m.context?.schools?.length ?? 0) > 0)
+    .at(-1)?.id ?? null;
 
   return (
     <div className="flex h-full relative">
@@ -938,13 +1029,22 @@ export default function ChatPage() {
                           <InlineCityCards cities={msg.context.cities} onSend={handleSend} />
                         )}
                         {msg.context.schools.length > 0 && (
-                          <InlineSchoolCards
-                            schools={msg.context.schools}
-                            onSelectSchool={(school) => {
-                              setSidebarFocusedSchool(school);
-                              setShowRightPanel(true);
-                            }}
-                          />
+                          <>
+                            <InlineSchoolCards
+                              schools={msg.context.schools}
+                              onSelectSchool={(school) => {
+                                setSidebarFocusedSchool(school);
+                                setShowRightPanel(true);
+                              }}
+                            />
+                            {msg.id === lastSchoolMsgId && (
+                              <SchoolPreferenceChips
+                                selected={schoolPreferences}
+                                onToggle={toggleSchoolPreference}
+                                onSearch={handleSchoolPreferenceSearch}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
                     )
