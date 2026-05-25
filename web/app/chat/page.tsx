@@ -160,6 +160,21 @@ function lsDeleteSession(id: string): void {
   } catch { /* ignore */ }
 }
 
+// チャット内容から費用シミュレーター表示意図を検出
+function detectCostSimIntent(userMsg: string, aiMsg: string): boolean {
+  const simWords  = ['シミュレーション', 'シミュレート', 'シミュして', 'シミュお願', '計算して', '計算お願', '見積', '試算'];
+  const costWords = ['費用', 'コスト', '生活費', 'いくら', '予算', '料金', 'お金'];
+  const userHasSim  = simWords.some(p => userMsg.includes(p));
+  const userHasCost = costWords.some(p => userMsg.includes(p));
+  // ユーザーが「費用 × シミュレーション」を組み合わせて言及
+  if (userHasSim && userHasCost) return true;
+  // 「シミュレーション」だけでも留学/ワーホリ文脈なら十分
+  if (userHasSim && (userMsg.includes('留学') || userMsg.includes('ワーホリ') || userMsg.includes('渡航'))) return true;
+  // AI がシミュレーターを提示・言及
+  if (aiMsg.includes('シミュレーター') || aiMsg.includes('費用シミュレーション') || aiMsg.includes('費用を計算')) return true;
+  return false;
+}
+
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60000);
@@ -782,6 +797,11 @@ export default function ChatPage() {
       const quickSelect = detectQuickSelect(fullContent);
       setSidebarContext(ctx);
       setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx, quickSelect } : m));
+
+      // 費用シミュレーション意図を検出したら自動表示
+      if (!showCostSimulator && detectCostSimIntent(text, fullContent)) {
+        setShowCostSimulator(true);
+      }
 
       const extractMsgs = [...newMessages, { role: 'assistant', content: fullContent }];
       fetch('/api/extract-travel', {
