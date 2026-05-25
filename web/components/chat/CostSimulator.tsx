@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 const JPY_PER_AUD = 95;
 
@@ -112,6 +112,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
     { type: 'sharehouse', weeks: 0 }, // 最後のフェーズ：残り期間が自動入力
   ]);
   const [flashField, setFlashField] = useState<string | null>(null);
+  const [flashTotal, setFlashTotal] = useState(false);
 
   const flash = (field: string) => {
     setFlashField(field);
@@ -146,6 +147,17 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
 
   const effWks = useMemo(() => getEffectiveWeeks(phases, total), [phases, total]);
   const costs  = useMemo(() => calcCosts(city, total, school, phases, effWks), [city, total, school, phases, effWks]);
+
+  // 合計が変わったら上部カードをフラッシュ
+  const prevGrandRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevGrandRef.current !== null && prevGrandRef.current !== costs.grand) {
+      setFlashTotal(true);
+      const t = setTimeout(() => setFlashTotal(false), 700);
+      return () => clearTimeout(t);
+    }
+    prevGrandRef.current = costs.grand;
+  }, [costs.grand]);
 
   const addPhase = () => {
     if (phases.length >= 4) return;
@@ -204,6 +216,52 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
         </div>
         <button onClick={onClose}
           className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-muted hover:text-primary transition-all text-sm">✕</button>
+      </div>
+
+      {/* ── リアルタイム合計（常時表示） ── */}
+      <div className={`flex-shrink-0 px-4 py-3 border-b border-border transition-colors duration-300 ${
+        flashTotal ? 'bg-primary/10' : 'bg-gradient-to-br from-primary/[0.06] to-transparent'
+      }`}>
+        <div className="flex items-end justify-between mb-2">
+          <div>
+            <div className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-0.5">合計費用（目安）</div>
+            <div className="text-2xl font-bold text-primary tabular-nums leading-none">
+              {jpy(costs.grand)}
+            </div>
+            <div className="text-[11px] text-muted mt-0.5">{aud(costs.grand)}</div>
+          </div>
+          <div className="text-right text-[10px] text-muted leading-relaxed">
+            <div className="font-medium">{city}・{total}週</div>
+            {school > 0 && <div>語学 {school}週含む</div>}
+          </div>
+        </div>
+        {/* 費用構成バー */}
+        <div className="flex rounded-full overflow-hidden h-2 gap-px">
+          {[
+            { value: costs.flights + costs.visa, color: 'bg-orange-300' },
+            { value: costs.school,               color: 'bg-amber-400'  },
+            { value: costs.rent,                 color: 'bg-primary'    },
+            { value: costs.food,                 color: 'bg-emerald-400'},
+            { value: costs.transport + costs.insurance + costs.misc, color: 'bg-slate-300' },
+          ].filter(s => s.value > 0).map((seg, i) => (
+            <div key={i} style={{ width: `${(seg.value / costs.grand) * 100}%` }}
+              className={`transition-all duration-500 ${seg.color}`} />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-0 mt-1.5">
+          {[
+            { label: '渡航・ビザ', value: costs.flights + costs.visa, color: 'bg-orange-300' },
+            { label: '学校',       value: costs.school,               color: 'bg-amber-400'  },
+            { label: '家賃',       value: costs.rent,                 color: 'bg-primary'    },
+            { label: '食費',       value: costs.food,                 color: 'bg-emerald-400'},
+            { label: '生活費',     value: costs.transport + costs.insurance + costs.misc, color: 'bg-slate-300' },
+          ].filter(s => s.value > 0).map((seg, i) => (
+            <div key={i} className="flex items-center gap-1 text-[9px] text-muted">
+              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${seg.color}`} />
+              <span>{seg.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
