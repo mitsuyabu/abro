@@ -900,7 +900,7 @@ export default function ChatPage() {
             </div>
           ) : (
             <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6 flex flex-col gap-5">
-              {messages.map(msg => (
+              {messages.map((msg, msgIndex) => (
                 <div key={msg.id}>
                   <div className={`flex gap-2 sm:gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'assistant' && (
@@ -949,8 +949,9 @@ export default function ChatPage() {
                       </div>
                     )
                   )}
-                  {/* クイック選択UI（期間・月） */}
-                  {msg.role === 'assistant' && msg.quickSelect && !msg.planData && (
+                  {/* クイック選択UI（期間・月）：ユーザーがまだ返信していない場合のみ表示 */}
+                  {msg.role === 'assistant' && msg.quickSelect && !msg.planData &&
+                    !messages.slice(msgIndex + 1).some(m => m.role === 'user') && (
                     msg.quickSelect === 'month' ? (
                       <QuickSelectMonth onSend={handleSend} />
                     ) : (
