@@ -26,13 +26,12 @@ const CITY_COSTS: Record<City, CityData> = {
   パース:           { homestay: 250, sharehouse: 170, apartment: 410, food: 125, transport: 38 },
 };
 
-const SCHOOL_FEE  = 280;  // AUD/week
-const INSURANCE   = 30;   // AUD/week
-const MISC        = 50;   // AUD/week
+const SCHOOL_FEE  = 280;
+const INSURANCE   = 30;
+const MISC        = 50;
 const FLIGHTS_AUD = 1400;
 const VISA_AUD    = 635;
 
-// 月別クイック選択
 const MONTH_PRESETS = [
   { label: '1ヶ月', weeks: 4  },
   { label: '2ヶ月', weeks: 8  },
@@ -94,8 +93,7 @@ function normalizeCity(name: string | null | undefined): City | null {
 function getEffectiveWeeks(phases: Phase[], total: number): number[] {
   if (phases.length === 0) return [];
   const nonLastSum = phases.slice(0, -1).reduce((s, p) => s + p.weeks, 0);
-  const lastWeeks  = Math.max(0, total - nonLastSum);
-  return [...phases.slice(0, -1).map(p => p.weeks), lastWeeks];
+  return [...phases.slice(0, -1).map(p => p.weeks), Math.max(0, total - nonLastSum)];
 }
 
 function calcCosts(city: City, total: number, schoolWks: number, phases: Phase[], effWks: number[]) {
@@ -120,6 +118,18 @@ function calcCosts(city: City, total: number, schoolWks: number, phases: Phase[]
   };
 }
 
+// ON/OFF トグルスイッチ
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex-shrink-0 w-7 h-4 rounded-full relative transition-colors duration-200 ${on ? 'bg-primary' : 'bg-gray-200'}`}
+    >
+      <span className={`absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 ${on ? 'translate-x-3' : 'translate-x-0'}`} />
+    </button>
+  );
+}
+
 export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chatSync?: ChatSync }) {
   const [city, setCity]     = useState<City>('ブリスベン');
   const [total, setTotal]   = useState(24);
@@ -128,13 +138,22 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
     { type: 'homestay',   weeks: 4 },
     { type: 'sharehouse', weeks: 0 },
   ]);
-  const [flashField, setFlashField] = useState<string | null>(null);
-  const [flashTotal, setFlashTotal] = useState(false);
-  const [tokyoType, setTokyoType]   = useState<TokyoType>('sharehouse');
+  const [flashField, setFlashField]   = useState<string | null>(null);
+  const [flashTotal, setFlashTotal]   = useState(false);
+  const [tokyoType, setTokyoType]     = useState<TokyoType>('sharehouse');
+  const [disabledItems, setDisabledItems] = useState<Set<string>>(new Set());
 
   const flash = (field: string) => {
     setFlashField(field);
     setTimeout(() => setFlashField(null), 1500);
+  };
+
+  const toggleItem = (key: string) => {
+    setDisabledItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -163,22 +182,40 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const effWks = useMemo(() => getEffectiveWeeks(phases, total), [phases, total]);
   const costs  = useMemo(() => calcCosts(city, total, school, phases, effWks), [city, total, school, phases, effWks]);
 
+  // 費用行（key 付き）
+  const rowData = useMemo(() => [
+    { key: 'flights',   label: '✈️ 航空券（片道目安）', value: costs.flights  },
+    { key: 'visa',      label: '📄 ビザ申請費',          value: costs.visa     },
+    ...(costs.school > 0 ? [{ key: 'school',    label: '🎓 語学学校費',  value: costs.school    }] : []),
+    { key: 'rent',      label: '🏠 家賃・滞在費',         value: costs.rent     },
+    ...(costs.food > 0   ? [{ key: 'food',      label: '🍽️ 食費',       value: costs.food      }] : []),
+    { key: 'transport', label: '🚌 交通費',               value: costs.transport },
+    { key: 'insurance', label: '🛡️ 海外保険',            value: costs.insurance },
+    { key: 'misc',      label: '📱 通信・娯楽',           value: costs.misc     },
+  ], [costs]);
+
+  // 有効な項目だけの合計（AUD）
+  const effectiveGrandAUD = rowData
+    .filter(r => !disabledItems.has(r.key))
+    .reduce((s, r) => s + r.value, 0);
+  const hasDisabled = disabledItems.size > 0;
+
   // 合計変化でトップカードをフラッシュ
   const prevGrandRef = useRef<number | null>(null);
   useEffect(() => {
-    if (prevGrandRef.current !== null && prevGrandRef.current !== costs.grand) {
+    if (prevGrandRef.current !== null && prevGrandRef.current !== effectiveGrandAUD) {
       setFlashTotal(true);
       const t = setTimeout(() => setFlashTotal(false), 700);
       return () => clearTimeout(t);
     }
-    prevGrandRef.current = costs.grand;
-  }, [costs.grand]);
+    prevGrandRef.current = effectiveGrandAUD;
+  }, [effectiveGrandAUD]);
 
   // 東京比較
-  const tokyoWeekly = Object.values(TOKYO_COSTS[tokyoType]).reduce((a, b) => a + b, 0);
-  const tokyoGrand  = tokyoWeekly * total;
-  const australiaJPY = Math.round(costs.grand * JPY_PER_AUD);
-  const diff        = australiaJPY - tokyoGrand;
+  const tokyoWeekly  = Object.values(TOKYO_COSTS[tokyoType]).reduce((a, b) => a + b, 0);
+  const tokyoGrand   = tokyoWeekly * total;
+  const australiaJPY = Math.round(effectiveGrandAUD * JPY_PER_AUD);
+  const diff         = australiaJPY - tokyoGrand;
 
   const addPhase = () => {
     if (phases.length >= 4) return;
@@ -187,18 +224,13 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
       return [...prev.slice(0, -1), { type: 'apartment', weeks: 4 }, last];
     });
   };
-
-  const removePhase = (i: number) => {
-    setPhases(prev => prev.filter((_, idx) => idx !== i));
-  };
-
+  const removePhase = (i: number) => setPhases(prev => prev.filter((_, idx) => idx !== i));
   const setPhaseType  = (i: number, t: AccType) =>
     setPhases(prev => prev.map((p, idx) => idx === i ? { ...p, type: t } : p));
-
   const setPhaseWeeks = (i: number, delta: number) => {
     setPhases(prev => {
       const otherSum = prev.slice(0, -1).reduce((s, p, idx) => idx === i ? s : s + p.weeks, 0);
-      const max = Math.max(1, total - otherSum - 1);
+      const max  = Math.max(1, total - otherSum - 1);
       const next = Math.max(1, Math.min(prev[i].weeks + delta, max));
       return prev.map((p, idx) => idx === i ? { ...p, weeks: next } : p);
     });
@@ -210,16 +242,15 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const months = (w: number) => `約${Math.round(w / 4.3)}ヶ月`;
   const hasChatSync = !!(chatSync?.city || chatSync?.totalWeeks || chatSync?.schoolWeeks);
 
-  const rows = [
-    { label: '✈️ 航空券（片道目安）', value: costs.flights },
-    { label: '📄 ビザ申請費',         value: costs.visa },
-    ...(costs.school > 0 ? [{ label: '🎓 語学学校費', value: costs.school }] : []),
-    { label: '🏠 家賃・滞在費',        value: costs.rent },
-    ...(costs.food > 0 ? [{ label: '🍽️ 食費', value: costs.food }] : []),
-    { label: '🚌 交通費',             value: costs.transport },
-    { label: '🛡️ 海外保険',          value: costs.insurance },
-    { label: '📱 通信・娯楽',         value: costs.misc },
-  ];
+  // 上部バー用（無効項目を除いた比率）
+  const getEff = (key: string, val: number) => disabledItems.has(key) ? 0 : val;
+  const barData = [
+    { value: getEff('flights', costs.flights) + getEff('visa', costs.visa), color: 'bg-orange-300', label: '渡航・ビザ' },
+    { value: getEff('school', costs.school),                                 color: 'bg-amber-400',  label: '学校' },
+    { value: getEff('rent', costs.rent),                                     color: 'bg-primary',    label: '家賃' },
+    { value: getEff('food', costs.food),                                     color: 'bg-emerald-400',label: '食費' },
+    { value: getEff('transport', costs.transport) + getEff('insurance', costs.insurance) + getEff('misc', costs.misc), color: 'bg-slate-300', label: '生活費' },
+  ].filter(s => s.value > 0);
 
   const flashCls = 'ring-2 ring-primary/30 bg-primary/[0.03] rounded-xl p-1.5 -mx-1.5';
 
@@ -231,9 +262,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
           <span>💰</span>
           <span className="text-sm font-bold text-primary">費用シミュレーター</span>
           {hasChatSync && (
-            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-              🔗 チャット連動中
-            </span>
+            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">🔗 チャット連動中</span>
           )}
         </div>
         <button onClick={onClose}
@@ -246,41 +275,43 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
       }`}>
         <div className="flex items-end justify-between mb-2">
           <div>
-            <div className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-0.5">合計費用（目安）</div>
-            <div className="text-2xl font-bold text-primary tabular-nums leading-none">{jpy(costs.grand)}</div>
-            <div className="text-[11px] text-muted mt-0.5">{aud(costs.grand)}</div>
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <div className="text-[10px] font-semibold text-muted uppercase tracking-wide">合計費用（目安）</div>
+              {hasDisabled && (
+                <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                  {disabledItems.size}項目を除外中
+                </span>
+              )}
+            </div>
+            <div className="text-2xl font-bold text-primary tabular-nums leading-none">
+              {jpyRaw(effectiveGrandAUD * JPY_PER_AUD)}
+            </div>
+            <div className="text-[11px] text-muted mt-0.5">{aud(effectiveGrandAUD)}</div>
           </div>
           <div className="text-right text-[10px] text-muted leading-relaxed">
             <div className="font-medium">{city}・{total}週</div>
             {school > 0 && <div>語学 {school}週含む</div>}
           </div>
         </div>
-        <div className="flex rounded-full overflow-hidden h-2 gap-px">
-          {[
-            { value: costs.flights + costs.visa, color: 'bg-orange-300' },
-            { value: costs.school,               color: 'bg-amber-400'  },
-            { value: costs.rent,                 color: 'bg-primary'    },
-            { value: costs.food,                 color: 'bg-emerald-400'},
-            { value: costs.transport + costs.insurance + costs.misc, color: 'bg-slate-300' },
-          ].filter(s => s.value > 0).map((seg, i) => (
-            <div key={i} style={{ width: `${(seg.value / costs.grand) * 100}%` }}
-              className={`transition-all duration-500 ${seg.color}`} />
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0 mt-1.5">
-          {[
-            { label: '渡航・ビザ', value: costs.flights + costs.visa, color: 'bg-orange-300' },
-            { label: '学校',       value: costs.school,               color: 'bg-amber-400'  },
-            { label: '家賃',       value: costs.rent,                 color: 'bg-primary'    },
-            { label: '食費',       value: costs.food,                 color: 'bg-emerald-400'},
-            { label: '生活費',     value: costs.transport + costs.insurance + costs.misc, color: 'bg-slate-300' },
-          ].filter(s => s.value > 0).map((seg, i) => (
-            <div key={i} className="flex items-center gap-1 text-[9px] text-muted">
-              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${seg.color}`} />
-              <span>{seg.label}</span>
+        {barData.length > 0 && (
+          <>
+            <div className="flex rounded-full overflow-hidden h-2 gap-px">
+              {barData.map((seg, i) => (
+                <div key={i}
+                  style={{ width: `${(seg.value / effectiveGrandAUD) * 100}%` }}
+                  className={`transition-all duration-500 ${seg.color}`} />
+              ))}
             </div>
-          ))}
-        </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0 mt-1.5">
+              {barData.map((seg, i) => (
+                <div key={i} className="flex items-center gap-1 text-[9px] text-muted">
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${seg.color}`} />
+                  <span>{seg.label}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -290,18 +321,14 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
           <div className={`transition-all duration-300 ${flashField === 'city' ? flashCls : ''}`}>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-semibold text-muted uppercase tracking-wide">🏙️ 都市</label>
-              {flashField === 'city' && (
-                <span className="text-[10px] text-primary font-medium animate-pulse">AIが更新 ✦</span>
-              )}
+              {flashField === 'city' && <span className="text-[10px] text-primary font-medium animate-pulse">AIが更新 ✦</span>}
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               {CITIES.map(c => (
                 <button key={c} onClick={() => setCity(c)}
                   className={`py-1.5 rounded-lg text-[11px] font-medium transition-all border ${
                     city === c ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border hover:border-primary/50 hover:bg-primary/5'
-                  }`}>
-                  {c}
-                </button>
+                  }`}>{c}</button>
               ))}
             </div>
           </div>
@@ -311,26 +338,18 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-semibold text-muted uppercase tracking-wide">📅 滞在期間</label>
               <div className="flex items-center gap-1.5">
-                {flashField === 'total' && (
-                  <span className="text-[10px] text-primary font-medium animate-pulse">AIが更新 ✦</span>
-                )}
+                {flashField === 'total' && <span className="text-[10px] text-primary font-medium animate-pulse">AIが更新 ✦</span>}
                 <span className="text-sm font-bold text-primary">
-                  {total}週
-                  <span className="text-[11px] font-normal text-muted ml-1">（{months(total)}）</span>
+                  {total}週<span className="text-[11px] font-normal text-muted ml-1">（{months(total)}）</span>
                 </span>
               </div>
             </div>
-            {/* 月クイック選択 */}
             <div className="flex gap-1 mb-2 overflow-x-auto pb-0.5 scrollbar-hide">
               {MONTH_PRESETS.map(p => (
                 <button key={p.weeks} onClick={() => setTotal(p.weeks)}
                   className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
-                    total === p.weeks
-                      ? 'bg-primary text-white border-primary'
-                      : 'bg-white text-primary border-border hover:border-primary/50 hover:bg-primary/5'
-                  }`}>
-                  {p.label}
-                </button>
+                    total === p.weeks ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border hover:border-primary/50 hover:bg-primary/5'
+                  }`}>{p.label}</button>
               ))}
             </div>
             <input type="range" min={4} max={52} step={2} value={total}
@@ -345,18 +364,14 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
           <div className={`transition-all duration-300 ${flashField === 'school' ? flashCls : ''}`}>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-semibold text-muted uppercase tracking-wide">🎓 語学学校</label>
-              {flashField === 'school' && (
-                <span className="text-[10px] text-primary font-medium animate-pulse">AIが更新 ✦</span>
-              )}
+              {flashField === 'school' && <span className="text-[10px] text-primary font-medium animate-pulse">AIが更新 ✦</span>}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {[0, 4, 8, 12, 16, 24].map(w => (
                 <button key={w} onClick={() => setSchool(w)}
                   className={`py-1 px-2.5 rounded-full text-xs font-medium transition-all border ${
                     school === w ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border hover:border-primary/50 hover:bg-primary/5'
-                  }`}>
-                  {w === 0 ? 'なし' : `${w}週`}
-                </button>
+                  }`}>{w === 0 ? 'なし' : `${w}週`}</button>
               ))}
             </div>
           </div>
@@ -365,13 +380,10 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
           <div>
             <label className="text-[11px] font-semibold text-muted uppercase tracking-wide block mb-2">🏠 滞在プラン</label>
             <div className="flex rounded-full overflow-hidden h-2.5 mb-2 gap-px">
-              {phases.map((phase, i) => {
-                const pct = total > 0 ? (effWks[i] / total) * 100 : 0;
-                return (
-                  <div key={i} style={{ width: `${pct}%` }}
-                    className={`transition-all duration-500 ${ACC_BAR[phase.type]}`} />
-                );
-              })}
+              {phases.map((phase, i) => (
+                <div key={i} style={{ width: `${total > 0 ? (effWks[i] / total) * 100 : 0}%` }}
+                  className={`transition-all duration-500 ${ACC_BAR[phase.type]}`} />
+              ))}
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-3">
               {phases.map((phase, i) => (
@@ -384,34 +396,23 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
             <div className="space-y-2">
               {phases.map((phase, i) => {
                 const isLast = i === phases.length - 1;
-                const canRemove = !isLast || phases.length > 1;
                 return (
                   <div key={i} className={`border rounded-xl p-2.5 transition-colors ${ACC_CARD[phase.type]}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-wide ${ACC_TEXT[phase.type]}`}>
-                        フェーズ {i + 1}
-                      </span>
+                      <span className={`text-[10px] font-bold uppercase tracking-wide ${ACC_TEXT[phase.type]}`}>フェーズ {i + 1}</span>
                       <div className="flex items-center gap-2">
                         {isLast ? (
-                          <span className={`text-[11px] font-semibold ${ACC_TEXT[phase.type]}`}>
-                            残り {effWks[i]}週間
-                          </span>
+                          <span className={`text-[11px] font-semibold ${ACC_TEXT[phase.type]}`}>残り {effWks[i]}週間</span>
                         ) : (
                           <div className="flex items-center gap-0.5">
                             <button onClick={() => setPhaseWeeks(i, -1)}
-                              className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/50 transition-all ${ACC_TEXT[phase.type]}`}>
-                              −
-                            </button>
-                            <span className={`text-xs font-bold w-8 text-center ${ACC_TEXT[phase.type]}`}>
-                              {phase.weeks}週
-                            </span>
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/50 transition-all ${ACC_TEXT[phase.type]}`}>−</button>
+                            <span className={`text-xs font-bold w-8 text-center ${ACC_TEXT[phase.type]}`}>{phase.weeks}週</span>
                             <button onClick={() => setPhaseWeeks(i, +1)}
-                              className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/50 transition-all ${ACC_TEXT[phase.type]}`}>
-                              +
-                            </button>
+                              className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold hover:bg-white/50 transition-all ${ACC_TEXT[phase.type]}`}>+</button>
                           </div>
                         )}
-                        {canRemove && (
+                        {(!isLast || phases.length > 1) && (
                           <button onClick={() => removePhase(i)}
                             className="text-muted/50 hover:text-red-400 transition-colors text-xs leading-none ml-0.5">✕</button>
                         )}
@@ -420,9 +421,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                     <div className="flex gap-1">
                       {(['homestay', 'sharehouse', 'apartment'] as AccType[]).map(t => (
                         <button key={t} onClick={() => setPhaseType(i, t)}
-                          className={`flex-1 py-1.5 rounded-lg text-center transition-all ${
-                            phase.type === t ? ACC_BTN_ON[t] : 'bg-white/70 text-muted hover:bg-white'
-                          }`}>
+                          className={`flex-1 py-1.5 rounded-lg text-center transition-all ${phase.type === t ? ACC_BTN_ON[t] : 'bg-white/70 text-muted hover:bg-white'}`}>
                           <div className="text-[10px] font-semibold">{ACC_SHORT[t]}</div>
                           <div className={`text-[9px] ${phase.type === t ? 'text-white/70' : 'text-muted/60'}`}>{ACC_SUB[t]}</div>
                         </button>
@@ -444,29 +443,48 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
 
         {/* 費用内訳 */}
         <div className="px-4 pt-4 pb-6">
-          <div className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-3">費用内訳（目安）</div>
-          <div className="space-y-2.5">
-            {rows.map(row => (
-              <div key={row.label} className="flex items-center justify-between">
-                <span className="text-xs text-primary/70 flex-1 mr-2">{row.label}</span>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-xs font-semibold text-primary">{jpy(row.value)}</div>
-                  <div className="text-[10px] text-muted">{aud(row.value)}</div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[11px] font-semibold text-muted uppercase tracking-wide">費用内訳（目安）</div>
+            {hasDisabled && (
+              <button
+                onClick={() => setDisabledItems(new Set())}
+                className="text-[10px] text-primary hover:underline"
+              >
+                すべて有効に戻す
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {rowData.map(row => {
+              const isOff = disabledItems.has(row.key);
+              return (
+                <div key={row.key} className={`flex items-center gap-2 transition-opacity ${isOff ? 'opacity-40' : ''}`}>
+                  <Toggle on={!isOff} onToggle={() => toggleItem(row.key)} />
+                  <span className={`text-xs text-primary/70 flex-1 min-w-0 truncate ${isOff ? 'line-through' : ''}`}>
+                    {row.label}
+                  </span>
+                  <div className={`text-right flex-shrink-0 transition-all ${isOff ? 'invisible' : ''}`}>
+                    <div className="text-xs font-semibold text-primary">{jpy(row.value)}</div>
+                    <div className="text-[10px] text-muted">{aud(row.value)}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 合計 */}
           <div className="mt-4 pt-4 border-t-2 border-primary/10">
             <div className="flex items-end justify-between">
               <div>
-                <div className="text-xs font-semibold text-muted">合計（目安）</div>
+                <div className="text-xs font-semibold text-muted">
+                  合計（目安）{hasDisabled && <span className="text-[10px] text-amber-600 ml-1">一部除外</span>}
+                </div>
                 <div className="text-[10px] text-muted/70 mt-0.5">1 AUD ≈ ¥{JPY_PER_AUD}</div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-primary">{jpy(costs.grand)}</div>
-                <div className="text-xs text-muted">{aud(costs.grand)}</div>
+                <div className="text-2xl font-bold text-primary">{jpyRaw(effectiveGrandAUD * JPY_PER_AUD)}</div>
+                <div className="text-xs text-muted">{aud(effectiveGrandAUD)}</div>
               </div>
             </div>
           </div>
@@ -501,9 +519,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                 ))}
               </div>
             </div>
-
             <div className="px-3 py-3 space-y-2">
-              {/* 東京 */}
               <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
                 <div>
                   <div className="text-[11px] font-medium text-muted">東京（{total}週・生活費のみ）</div>
@@ -514,19 +530,15 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                   <div className="text-[10px] text-muted">{jpyRaw(tokyoWeekly)}/週</div>
                 </div>
               </div>
-
-              {/* オーストラリア */}
               <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2">
                 <div>
                   <div className="text-[11px] font-medium text-primary">オーストラリア（合計）</div>
-                  <div className="text-[10px] text-muted/60">航空券・ビザ・学校含む</div>
+                  <div className="text-[10px] text-muted/60">{hasDisabled ? '一部除外を反映' : '航空券・ビザ・学校含む'}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-bold text-primary">{jpyRaw(australiaJPY)}</div>
                 </div>
               </div>
-
-              {/* 差額 */}
               <div className={`rounded-xl px-3 py-2 text-center ${diff > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
                 <span className="text-[11px] text-muted">海外留学は東京より</span>
                 <span className={`text-[11px] font-bold ml-1 ${diff > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
