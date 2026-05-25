@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -48,6 +48,140 @@ interface Message {
   planData?: { id: string; plan: GeneratedPlan };
   quickSelect?: QuickSelectType;
 }
+
+// ── セッション管理 ────────────────────────────────────────────────────
+
+interface SessionSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messageCount: number;
+}
+
+interface StoredSession {
+  messages: Message[];
+  conversationState: ConversationState;
+}
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function getSessionTitle(messages: Message[]): string {
+  const first = messages.find(m => m.role === 'user');
+  if (!first) return '新しいチャット';
+  const t = first.content.trim();
+  return t.length > 28 ? t.slice(0, 28) + '…' : t;
+}
+
+function lsGetSessions(): SessionSummary[] {
+  try {
+    const raw = localStorage.getItem('abro-chat-sessions');
+    return raw ? (JSON.parse(raw) as SessionSummary[]) : [];
+  } catch { return []; }
+}
+
+function lsSaveSessions(sessions: SessionSummary[]): void {
+  try { localStorage.setItem('abro-chat-sessions', JSON.stringify(sessions)); } catch { /* ignore */ }
+}
+
+function lsSaveSession(id: string, messages: Message[], conversationState: ConversationState): void {
+  try {
+    const stored: StoredSession = { messages, conversationState };
+    localStorage.setItem(`abro-chat-session-${id}`, JSON.stringify(stored));
+    const sessions = lsGetSessions();
+    const title = getSessionTitle(messages);
+    const idx = sessions.findIndex(s => s.id === id);
+    const summary: SessionSummary = { id, title, updatedAt: Date.now(), messageCount: messages.length };
+    if (idx >= 0) sessions[idx] = summary; else sessions.unshift(summary);
+    lsSaveSessions(sessions);
+  } catch { /* ignore */ }
+}
+
+function lsLoadSession(id: string): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(`abro-chat-session-${id}`);
+    return raw ? (JSON.parse(raw) as StoredSession) : null;
+  } catch { return null; }
+}
+
+function lsDeleteSession(id: string): void {
+  try {
+    localStorage.removeItem(`abro-chat-session-${id}`);
+    lsSaveSessions(lsGetSessions().filter(s => s.id !== id));
+  } catch { /* ignore */ }
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'たった今';
+  if (mins < 60) return `${mins}分前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}時間前`;
+  return `${Math.floor(hours / 24)}日前`;
+}
+
+function SessionDropdown({
+  sessions,
+  currentId,
+  onNew,
+  onLoad,
+  onDelete,
+}: {
+  sessions: SessionSummary[];
+  currentId: string;
+  onNew: () => void;
+  onLoad: (id: string) => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
+}) {
+  return (
+    <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-border rounded-2xl shadow-xl z-50 overflow-hidden">
+      <div className="p-2 border-b border-border">
+        <button
+          onClick={onNew}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-primary/5 transition-colors text-left"
+        >
+          <span className="text-sm">✏️</span>
+          <span className="text-sm font-semibold text-primary">新しいチャット</span>
+        </button>
+      </div>
+      <div className="max-h-72 overflow-y-auto">
+        {sessions.length === 0 ? (
+          <p className="text-xs text-muted text-center py-6">まだチャット履歴がありません</p>
+        ) : (
+          sessions.map(session => (
+            <div
+              key={session.id}
+              onClick={() => onLoad(session.id)}
+              className={`flex items-center group px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-border/40 last:border-0 ${
+                session.id === currentId ? 'bg-primary/5' : ''
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-primary font-medium truncate">{session.title}</p>
+                <p className="text-[10px] text-muted mt-0.5">{timeAgo(session.updatedAt)}</p>
+              </div>
+              <button
+                onClick={(e) => onDelete(session.id, e)}
+                className="ml-2 flex-shrink-0 p-1 opacity-0 group-hover:opacity-100 text-muted hover:text-red-500 transition-all"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4h6v2" />
+                </svg>
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
 
 function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text: string) => void }) {
   return (
@@ -191,18 +325,15 @@ const CITY_FOCUS_PATTERNS = [
 function cityIsFocused(cityName: string, content: string): boolean {
   const count = (content.match(new RegExp(cityName, 'g')) || []).length;
   if (count >= 2) return true;
-  // 1回だけでも推薦パターンの直後・直前にある場合
   return CITY_FOCUS_PATTERNS.some(pat => {
     const idx = content.indexOf(pat);
     if (idx === -1) return false;
-    // パターンの前後50文字以内に都市名があるか
     const window = content.slice(Math.max(0, idx - 50), idx + 50);
     return window.includes(cityName);
   });
 }
 
 function detectSidebarContext(content: string, userMessage: string, allSchools: SchoolItem[]): SidebarContext {
-  // 都市カードはユーザーが言及 OR AIが2回以上言及 OR 推薦パターン付きの場合のみ表示
   const cities = CITY_DATA.filter(c =>
     userMessage.includes(c.name) || cityIsFocused(c.name, content)
   );
@@ -214,7 +345,6 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
     (content.includes('相談') || content.includes('おすすめ') || content.includes('提案') || content.includes('紹介'));
   const lowerContent = content.toLowerCase();
 
-  // 学校トピック × フォーカス都市がある場合のみ都市絞り込み学校を表示
   const mentionsSchoolTopic =
     content.includes('語学学校') || lowerContent.includes('english school') || lowerContent.includes('language school');
 
@@ -233,7 +363,6 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
     targetCityNames = new Set(cities.map(c => c.name));
   }
 
-  // 都市が特定されている場合はその都市の学校のみ（他都市の同名校を拾わないよう制限）
   const schoolsByName = targetCityNames.size > 0
     ? allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()) && targetCityNames.has(s.city))
     : allSchools.filter(s => lowerContent.includes(s.name.toLowerCase()));
@@ -380,55 +509,129 @@ export default function ChatPage() {
   const [sidebarFocusedSchool, setSidebarFocusedSchool] = useState<SchoolItem | null>(null);
   const [conversationState, setConversationState] = useState<ConversationState>(getInitialState());
   const [chatLoaded, setChatLoaded] = useState(false);
+
+  // セッション管理
+  const sessionIdRef = useRef<string>(generateId());
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const msgCountRef = useRef(0);
 
-  // チャット履歴をlocalStorageから復元
+  // 起動時：セッション読み込み（旧フォーマットからの移行も対応）
   useEffect(() => {
     try {
-      const savedMsgs = localStorage.getItem('abro-chat-messages');
-      const savedState = localStorage.getItem('abro-conversation-state');
-      if (savedMsgs) {
-        const parsed = JSON.parse(savedMsgs) as Message[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMessages(parsed);
-          msgCountRef.current = parsed.length;
+      const savedSessions = lsGetSessions();
+
+      if (savedSessions.length === 0) {
+        // 旧フォーマット（abro-chat-messages）から移行
+        const savedMsgs = localStorage.getItem('abro-chat-messages');
+        const savedState = localStorage.getItem('abro-conversation-state');
+        if (savedMsgs) {
+          const parsed = JSON.parse(savedMsgs) as Message[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const state: ConversationState = savedState ? JSON.parse(savedState) : getInitialState();
+            lsSaveSession(sessionIdRef.current, parsed, state);
+            setMessages(parsed);
+            setConversationState(state);
+            msgCountRef.current = parsed.length;
+            localStorage.removeItem('abro-chat-messages');
+            localStorage.removeItem('abro-conversation-state');
+            setSessions(lsGetSessions());
+          }
         }
-      }
-      if (savedState) {
-        setConversationState(JSON.parse(savedState));
+      } else {
+        // 最新セッションを読み込む
+        const latest = savedSessions[0];
+        sessionIdRef.current = latest.id;
+        const data = lsLoadSession(latest.id);
+        if (data) {
+          setMessages(data.messages);
+          setConversationState(data.conversationState);
+          msgCountRef.current = data.messages.length;
+        }
+        setSessions(savedSessions);
       }
     } catch { /* ignore */ }
     setChatLoaded(true);
   }, []);
 
-  // メッセージをlocalStorageに保存
+  // メッセージ・会話状態が変わったら自動保存
   useEffect(() => {
     if (!chatLoaded) return;
-    try {
-      localStorage.setItem('abro-chat-messages', JSON.stringify(messages));
-    } catch { /* ignore */ }
-  }, [messages, chatLoaded]);
-
-  // 会話状態をlocalStorageに保存
-  useEffect(() => {
-    if (!chatLoaded) return;
-    try {
-      localStorage.setItem('abro-conversation-state', JSON.stringify(conversationState));
-    } catch { /* ignore */ }
-  }, [conversationState, chatLoaded]);
+    if (messages.length === 0) return;
+    lsSaveSession(sessionIdRef.current, messages, conversationState);
+  }, [messages, conversationState, chatLoaded]);
 
   const handleNewChat = () => {
+    if (messages.length > 0) {
+      lsSaveSession(sessionIdRef.current, messages, conversationState);
+    }
+    sessionIdRef.current = generateId();
     setMessages([]);
     setConversationState(getInitialState());
     setSidebarContext({ countries: [], cities: [], schools: [], showAgents: false });
     setPlanError(null);
     msgCountRef.current = 0;
-    try {
-      localStorage.removeItem('abro-chat-messages');
-      localStorage.removeItem('abro-conversation-state');
-    } catch { /* ignore */ }
+    setShowSessionDropdown(false);
+    setSessions(lsGetSessions());
   };
+
+  const handleLoadSession = (id: string) => {
+    if (id === sessionIdRef.current) {
+      setShowSessionDropdown(false);
+      return;
+    }
+    if (messages.length > 0) {
+      lsSaveSession(sessionIdRef.current, messages, conversationState);
+    }
+    const data = lsLoadSession(id);
+    if (!data) return;
+    sessionIdRef.current = id;
+    setMessages(data.messages);
+    setConversationState(data.conversationState);
+    setSidebarContext({ countries: [], cities: [], schools: [], showAgents: false });
+    setPlanError(null);
+    msgCountRef.current = data.messages.length;
+    setShowSessionDropdown(false);
+    setSessions(lsGetSessions());
+  };
+
+  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    lsDeleteSession(id);
+    const updated = lsGetSessions();
+    setSessions(updated);
+    // 現在のセッションを削除した場合は新規作成
+    if (id === sessionIdRef.current) {
+      sessionIdRef.current = generateId();
+      setMessages([]);
+      setConversationState(getInitialState());
+      setSidebarContext({ countries: [], cities: [], schools: [], showAgents: false });
+      setPlanError(null);
+      msgCountRef.current = 0;
+    }
+  };
+
+  const handleToggleDropdown = () => {
+    if (!showSessionDropdown) {
+      setSessions(lsGetSessions()); // 開く前に最新を取得
+    }
+    setShowSessionDropdown(v => !v);
+  };
+
+  // ドロップダウン外クリックで閉じる
+  useEffect(() => {
+    if (!showSessionDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowSessionDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSessionDropdown]);
 
   useEffect(() => {
     fetch('/api/schools').then(r => r.json()).then(data => {
@@ -441,7 +644,7 @@ export default function ChatPage() {
     }).catch(e => console.error('[Abro] schools fetch error:', e));
   }, []);
 
-  // メッセージ数が増えた時だけ最下部へスクロール（ストリーミング中は除く）
+  // メッセージ数が増えた時だけ最下部へスクロール
   useEffect(() => {
     if (messages.length > msgCountRef.current) {
       msgCountRef.current = messages.length;
@@ -469,7 +672,6 @@ export default function ChatPage() {
         }),
       });
 
-      // メタデータをヘッダーから取得（スコアリング結果・フェーズ更新）
       const metaHeader = res.headers.get('X-Abro-Meta');
       if (metaHeader) {
         try {
@@ -501,7 +703,6 @@ export default function ChatPage() {
         setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: m.content + chunk } : m));
       }
 
-      // AIの返答からフェーズをさらに進める（AIが都市・学校・滞在先に言及した場合）
       setConversationState(prev => {
         const nextPh = advancePhase(prev, fullContent);
         return nextPh !== prev.currentPhase ? { ...prev, currentPhase: nextPh } : prev;
@@ -512,7 +713,6 @@ export default function ChatPage() {
       setSidebarContext(ctx);
       setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx, quickSelect } : m));
 
-      // 渡航情報を非同期抽出（チャットをブロックしない）
       const extractMsgs = [...newMessages, { role: 'assistant', content: fullContent }];
       fetch('/api/extract-travel', {
         method: 'POST',
@@ -575,11 +775,9 @@ export default function ChatPage() {
   const chatSyncData = useMemo((): ChatSync => {
     const city = conversationState.proposedCity;
 
-    // 全角数字 → 半角に正規化
     const toHalf = (s: string) =>
       s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 0x30));
 
-    // テキストから滞在期間(週)を抽出
     const extractWeeks = (text: string): number | null => {
       const t = toHalf(text);
       if (/1年|１年/.test(t))                         return 52;
@@ -593,8 +791,7 @@ export default function ChatPage() {
       return null;
     };
 
-    // 滞在期間：ユーザーメッセージのみ走査（AIの「最大1年のビザ」等の誤検知を防ぐ）
-    // 直近のメッセージから順に検索し、最初にマッチしたものを採用
+    // ユーザーメッセージのみ走査（AIの「最大1年のビザ」等の誤検知を防ぐ）
     let totalWeeks: number | null = null;
     const userMessages = messages.filter(m => m.role === 'user');
     for (const msg of [...userMessages].reverse().slice(0, 5)) {
@@ -602,7 +799,7 @@ export default function ChatPage() {
       if (w !== null) { totalWeeks = w; break; }
     }
 
-    // 語学学校週数：最新AI返答から抽出（全角対応）
+    // 語学学校週数：最新AI返答から抽出
     let schoolWeeks: number | null = null;
     if (latestAI) {
       const halfAI = toHalf(latestAI);
@@ -628,19 +825,36 @@ export default function ChatPage() {
     sidebarContext.schools.length > 0 ||
     sidebarContext.showAgents;
 
+  const currentSessionTitle = messages.length > 0
+    ? (messages.find(m => m.role === 'user')?.content.trim().slice(0, 25) ?? '新しいチャット')
+    : '新しいチャット';
+
   return (
     <div className="flex h-full relative">
       {/* チャットエリア */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* トップバー */}
         <div className="h-12 border-b border-border flex items-center px-4 md:px-5 bg-white gap-2">
-          <button
-            onClick={handleNewChat}
-            className="flex items-center gap-1 hover:opacity-70 transition-opacity"
-          >
-            <span className="text-sm font-semibold text-primary">新しいチャット</span>
-            <span className="text-muted text-xs">▾</span>
-          </button>
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={handleToggleDropdown}
+              className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+            >
+              <span className="text-sm font-semibold text-primary truncate max-w-[180px] sm:max-w-[240px]">
+                {currentSessionTitle}
+              </span>
+              <span className="text-muted text-xs flex-shrink-0">▾</span>
+            </button>
+            {showSessionDropdown && (
+              <SessionDropdown
+                sessions={sessions}
+                currentId={sessionIdRef.current}
+                onNew={handleNewChat}
+                onLoad={handleLoadSession}
+                onDelete={handleDeleteSession}
+              />
+            )}
+          </div>
           <span className="ml-auto text-xs font-medium text-primary/60 italic tracking-wide hidden sm:block">留学を、もっと自分らしく</span>
         </div>
 
@@ -834,8 +1048,6 @@ export default function ChatPage() {
         )}
       </div>
 
-      {/* 右パネル（デスクトップ：常時表示 / モバイル・タブレット：オーバーレイ） */}
-
       {/* デスクトップ固定右パネル */}
       <div className="hidden lg:flex w-96 xl:w-[420px] border-l border-border bg-background flex-shrink-0 flex-col h-full overflow-hidden">
         {showCostSimulator ? (
@@ -873,7 +1085,6 @@ export default function ChatPage() {
       {/* モバイル：全画面マップオーバーレイ */}
       {showMapView && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col">
-          {/* マップ本体 */}
           <div className="flex-1 min-h-0">
             <SidebarMapMobile
               cities={sidebarContext.cities}
@@ -888,7 +1099,6 @@ export default function ChatPage() {
               }}
             />
           </div>
-          {/* Back to chat ボタン */}
           <div className="flex-shrink-0 bg-black/90 backdrop-blur-sm px-6 py-5 flex justify-center">
             <button
               onClick={() => setShowMapView(false)}
