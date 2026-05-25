@@ -26,11 +26,29 @@ const CITY_COSTS: Record<City, CityData> = {
   パース:           { homestay: 250, sharehouse: 170, apartment: 410, food: 125, transport: 38 },
 };
 
-const SCHOOL_FEE = 280; // AUD/week
-const INSURANCE  = 30;  // AUD/week
-const MISC       = 50;  // AUD/week
+const SCHOOL_FEE  = 280;  // AUD/week
+const INSURANCE   = 30;   // AUD/week
+const MISC        = 50;   // AUD/week
 const FLIGHTS_AUD = 1400;
 const VISA_AUD    = 635;
+
+// 月別クイック選択
+const MONTH_PRESETS = [
+  { label: '1ヶ月', weeks: 4  },
+  { label: '2ヶ月', weeks: 8  },
+  { label: '3ヶ月', weeks: 12 },
+  { label: '4ヶ月', weeks: 18 },
+  { label: '6ヶ月', weeks: 26 },
+  { label: '9ヶ月', weeks: 38 },
+  { label: '1年',   weeks: 52 },
+] as const;
+
+// 東京の生活費目安（週あたり JPY）Numbeo 2025-2026
+const TOKYO_COSTS = {
+  sharehouse: { rent: 14000, food: 10000, transport: 3500, misc: 5000 },
+  apartment:  { rent: 26000, food: 10000, transport: 3500, misc: 5000 },
+} as const;
+type TokyoType = keyof typeof TOKYO_COSTS;
 
 const ACC_SHORT: Record<AccType, string> = { homestay: 'ホームステイ', sharehouse: 'シェア', apartment: 'APT' };
 const ACC_FULL:  Record<AccType, string> = { homestay: 'ホームステイ', sharehouse: 'シェアハウス', apartment: 'アパート' };
@@ -73,7 +91,6 @@ function normalizeCity(name: string | null | undefined): City | null {
   return tbl[name] ?? tbl[name.toLowerCase()] ?? null;
 }
 
-// 最後のフェーズの週数を残り期間から自動算出
 function getEffectiveWeeks(phases: Phase[], total: number): number[] {
   if (phases.length === 0) return [];
   const nonLastSum = phases.slice(0, -1).reduce((s, p) => s + p.weeks, 0);
@@ -104,22 +121,22 @@ function calcCosts(city: City, total: number, schoolWks: number, phases: Phase[]
 }
 
 export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chatSync?: ChatSync }) {
-  const [city, setCity]   = useState<City>('ブリスベン');
-  const [total, setTotal] = useState(24);
+  const [city, setCity]     = useState<City>('ブリスベン');
+  const [total, setTotal]   = useState(24);
   const [school, setSchool] = useState(8);
   const [phases, setPhases] = useState<Phase[]>([
-    { type: 'homestay',  weeks: 4 },
-    { type: 'sharehouse', weeks: 0 }, // 最後のフェーズ：残り期間が自動入力
+    { type: 'homestay',   weeks: 4 },
+    { type: 'sharehouse', weeks: 0 },
   ]);
   const [flashField, setFlashField] = useState<string | null>(null);
   const [flashTotal, setFlashTotal] = useState(false);
+  const [tokyoType, setTokyoType]   = useState<TokyoType>('sharehouse');
 
   const flash = (field: string) => {
     setFlashField(field);
     setTimeout(() => setFlashField(null), 1500);
   };
 
-  // チャットから都市を同期
   useEffect(() => {
     if (!chatSync?.city) return;
     const n = normalizeCity(chatSync.city);
@@ -127,7 +144,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatSync?.city]);
 
-  // チャットから滞在期間を同期
   useEffect(() => {
     const w = chatSync?.totalWeeks;
     if (!w || w < 4) return;
@@ -136,7 +152,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatSync?.totalWeeks]);
 
-  // チャットから語学学校週数を同期
   useEffect(() => {
     const s = chatSync?.schoolWeeks;
     if (s === null || s === undefined) return;
@@ -148,7 +163,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const effWks = useMemo(() => getEffectiveWeeks(phases, total), [phases, total]);
   const costs  = useMemo(() => calcCosts(city, total, school, phases, effWks), [city, total, school, phases, effWks]);
 
-  // 合計が変わったら上部カードをフラッシュ
+  // 合計変化でトップカードをフラッシュ
   const prevGrandRef = useRef<number | null>(null);
   useEffect(() => {
     if (prevGrandRef.current !== null && prevGrandRef.current !== costs.grand) {
@@ -158,6 +173,12 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
     }
     prevGrandRef.current = costs.grand;
   }, [costs.grand]);
+
+  // 東京比較
+  const tokyoWeekly = Object.values(TOKYO_COSTS[tokyoType]).reduce((a, b) => a + b, 0);
+  const tokyoGrand  = tokyoWeekly * total;
+  const australiaJPY = Math.round(costs.grand * JPY_PER_AUD);
+  const diff        = australiaJPY - tokyoGrand;
 
   const addPhase = () => {
     if (phases.length >= 4) return;
@@ -177,26 +198,27 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const setPhaseWeeks = (i: number, delta: number) => {
     setPhases(prev => {
       const otherSum = prev.slice(0, -1).reduce((s, p, idx) => idx === i ? s : s + p.weeks, 0);
-      const max = Math.max(1, total - otherSum - 1); // 最後のフェーズに最低1週残す
+      const max = Math.max(1, total - otherSum - 1);
       const next = Math.max(1, Math.min(prev[i].weeks + delta, max));
       return prev.map((p, idx) => idx === i ? { ...p, weeks: next } : p);
     });
   };
 
   const jpy    = (v: number) => `¥${Math.round(v * JPY_PER_AUD).toLocaleString()}`;
+  const jpyRaw = (v: number) => `¥${Math.round(v).toLocaleString()}`;
   const aud    = (v: number) => `A$${Math.round(v).toLocaleString()}`;
   const months = (w: number) => `約${Math.round(w / 4.3)}ヶ月`;
   const hasChatSync = !!(chatSync?.city || chatSync?.totalWeeks || chatSync?.schoolWeeks);
 
   const rows = [
-    { label: '✈️ 航空券（片道目安）',   value: costs.flights },
-    { label: '📄 ビザ申請費',            value: costs.visa },
+    { label: '✈️ 航空券（片道目安）', value: costs.flights },
+    { label: '📄 ビザ申請費',         value: costs.visa },
     ...(costs.school > 0 ? [{ label: '🎓 語学学校費', value: costs.school }] : []),
-    { label: '🏠 家賃・滞在費',           value: costs.rent },
+    { label: '🏠 家賃・滞在費',        value: costs.rent },
     ...(costs.food > 0 ? [{ label: '🍽️ 食費', value: costs.food }] : []),
-    { label: '🚌 交通費',                value: costs.transport },
-    { label: '🛡️ 海外保険',             value: costs.insurance },
-    { label: '📱 通信・娯楽',            value: costs.misc },
+    { label: '🚌 交通費',             value: costs.transport },
+    { label: '🛡️ 海外保険',          value: costs.insurance },
+    { label: '📱 通信・娯楽',         value: costs.misc },
   ];
 
   const flashCls = 'ring-2 ring-primary/30 bg-primary/[0.03] rounded-xl p-1.5 -mx-1.5';
@@ -225,9 +247,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
         <div className="flex items-end justify-between mb-2">
           <div>
             <div className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-0.5">合計費用（目安）</div>
-            <div className="text-2xl font-bold text-primary tabular-nums leading-none">
-              {jpy(costs.grand)}
-            </div>
+            <div className="text-2xl font-bold text-primary tabular-nums leading-none">{jpy(costs.grand)}</div>
             <div className="text-[11px] text-muted mt-0.5">{aud(costs.grand)}</div>
           </div>
           <div className="text-right text-[10px] text-muted leading-relaxed">
@@ -235,7 +255,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
             {school > 0 && <div>語学 {school}週含む</div>}
           </div>
         </div>
-        {/* 費用構成バー */}
         <div className="flex rounded-full overflow-hidden h-2 gap-px">
           {[
             { value: costs.flights + costs.visa, color: 'bg-orange-300' },
@@ -301,6 +320,19 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                 </span>
               </div>
             </div>
+            {/* 月クイック選択 */}
+            <div className="flex gap-1 mb-2 overflow-x-auto pb-0.5 scrollbar-hide">
+              {MONTH_PRESETS.map(p => (
+                <button key={p.weeks} onClick={() => setTotal(p.weeks)}
+                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all ${
+                    total === p.weeks
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-primary border-border hover:border-primary/50 hover:bg-primary/5'
+                  }`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
             <input type="range" min={4} max={52} step={2} value={total}
               onChange={e => setTotal(Number(e.target.value))}
               className="w-full accent-primary h-1.5 cursor-pointer" />
@@ -332,8 +364,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
           {/* 滞在プラン（フェーズ） */}
           <div>
             <label className="text-[11px] font-semibold text-muted uppercase tracking-wide block mb-2">🏠 滞在プラン</label>
-
-            {/* タイムラインバー */}
             <div className="flex rounded-full overflow-hidden h-2.5 mb-2 gap-px">
               {phases.map((phase, i) => {
                 const pct = total > 0 ? (effWks[i] / total) * 100 : 0;
@@ -343,7 +373,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                 );
               })}
             </div>
-            {/* 凡例 */}
             <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-3">
               {phases.map((phase, i) => (
                 <div key={i} className="flex items-center gap-1 text-[10px] text-muted">
@@ -352,15 +381,12 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                 </div>
               ))}
             </div>
-
-            {/* フェーズカード */}
             <div className="space-y-2">
               {phases.map((phase, i) => {
                 const isLast = i === phases.length - 1;
                 const canRemove = !isLast || phases.length > 1;
                 return (
                   <div key={i} className={`border rounded-xl p-2.5 transition-colors ${ACC_CARD[phase.type]}`}>
-                    {/* ヘッダー行 */}
                     <div className="flex items-center justify-between mb-2">
                       <span className={`text-[10px] font-bold uppercase tracking-wide ${ACC_TEXT[phase.type]}`}>
                         フェーズ {i + 1}
@@ -391,7 +417,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                         )}
                       </div>
                     </div>
-                    {/* タイプ選択 */}
                     <div className="flex gap-1">
                       {(['homestay', 'sharehouse', 'apartment'] as AccType[]).map(t => (
                         <button key={t} onClick={() => setPhaseType(i, t)}
@@ -407,7 +432,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                 );
               })}
             </div>
-
             {phases.length < 4 && (
               <button onClick={addPhase}
                 className="mt-2 text-[11px] text-primary/50 hover:text-primary flex items-center gap-1 transition-colors">
@@ -421,7 +445,6 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
         {/* 費用内訳 */}
         <div className="px-4 pt-4 pb-6">
           <div className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-3">費用内訳（目安）</div>
-
           <div className="space-y-2.5">
             {rows.map(row => (
               <div key={row.label} className="flex items-center justify-between">
@@ -460,8 +483,61 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
             </div>
           </div>
 
+          {/* 🗾 東京との比較 */}
+          <div className="mt-4 border border-border/60 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 border-b border-border/40">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+                <span>🗾</span>
+                <span>東京で同じ期間暮らしたら？</span>
+              </div>
+              <div className="flex gap-1">
+                {(['sharehouse', 'apartment'] as TokyoType[]).map(t => (
+                  <button key={t} onClick={() => setTokyoType(t)}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-all border ${
+                      tokyoType === t ? 'bg-primary text-white border-primary' : 'bg-white text-muted border-border hover:border-primary/40'
+                    }`}>
+                    {t === 'sharehouse' ? 'シェアハウス' : '1Kアパート'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-3 py-3 space-y-2">
+              {/* 東京 */}
+              <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2">
+                <div>
+                  <div className="text-[11px] font-medium text-muted">東京（{total}週・生活費のみ）</div>
+                  <div className="text-[10px] text-muted/60">家賃・食費・交通費など</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-primary">{jpyRaw(tokyoGrand)}</div>
+                  <div className="text-[10px] text-muted">{jpyRaw(tokyoWeekly)}/週</div>
+                </div>
+              </div>
+
+              {/* オーストラリア */}
+              <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2">
+                <div>
+                  <div className="text-[11px] font-medium text-primary">オーストラリア（合計）</div>
+                  <div className="text-[10px] text-muted/60">航空券・ビザ・学校含む</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-primary">{jpyRaw(australiaJPY)}</div>
+                </div>
+              </div>
+
+              {/* 差額 */}
+              <div className={`rounded-xl px-3 py-2 text-center ${diff > 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+                <span className="text-[11px] text-muted">海外留学は東京より</span>
+                <span className={`text-[11px] font-bold ml-1 ${diff > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                  {diff > 0 ? `+${jpyRaw(diff)} 多くかかる見込み` : `${jpyRaw(Math.abs(diff))} 節約できる`}
+                </span>
+              </div>
+            </div>
+          </div>
+
           <p className="text-[10px] text-muted mt-3 leading-relaxed">
-            ※ 為替・時期・生活スタイルにより変動します。詳細はエージェントへの無料相談をご利用ください。
+            ※ 為替・時期・生活スタイルにより変動します。東京データはNumbero 2025参考値。詳細はエージェントへの無料相談をご利用ください。
           </p>
         </div>
       </div>
