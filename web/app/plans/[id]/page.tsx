@@ -6,10 +6,27 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AgentContactModal } from '@/components/AgentContactModal';
 
+type TaskStatus = 'none' | 'doing' | 'done';
+
+interface FirstWeekDay {
+  day: string;
+  highlight: string;
+  tips: string;
+}
+
+interface YearlyMonth {
+  month: string;
+  title: string;
+  detail: string;
+}
+
 interface PlanDetails {
   duration_label?: string;
   pre_departure?: Record<string, string>;
   timeline?: { period: string; tasks: string[] }[];
+  timeline_status?: Record<string, TaskStatus>;
+  first_week?: FirstWeekDay[];
+  yearly_plan?: YearlyMonth[];
   notes?: string[];
   saved_items?: { label: string; type: 'school' | 'city' | 'other' }[];
 }
@@ -44,6 +61,15 @@ const PRE_LABELS: Record<string, string> = { visa: 'ビザ申請', school: '学�
 const PRE_ICONS: Record<string, string> = { visa: '📄', school: '🎓', accommodation: '🏠', insurance: '🛡️', flights: '✈️', local_preparation: '📱', job_search: '💼', english_study: '📚' };
 const ITEM_TYPE_ICONS: Record<string, string> = { school: '🎓', city: '📍', other: '📌' };
 
+const STATUS_CONFIG: Record<TaskStatus, { label: string; dot: string; bg: string; text: string }> = {
+  none:  { label: '未着手', dot: 'bg-gray-300',    bg: 'bg-gray-100',   text: 'text-gray-500'  },
+  doing: { label: '準備中', dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700' },
+  done:  { label: '完了',   dot: 'bg-emerald-400', bg: 'bg-emerald-50', text: 'text-emerald-700'},
+};
+const STATUS_ORDER: TaskStatus[] = ['none', 'doing', 'done'];
+
+const DAY_COLORS = ['bg-primary', 'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
+
 export default function PlanDetailPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -52,6 +78,14 @@ export default function PlanDetailPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  // タイトル編集
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // タイムラインステータス
+  const [timelineStatus, setTimelineStatus] = useState<Record<string, TaskStatus>>({});
 
   // カスタマイズ
   const [notes, setNotes] = useState<string[]>([]);
@@ -85,15 +119,40 @@ export default function PlanDetailPage() {
       setPlan(p);
       setNotes(p?.details?.notes ?? []);
       setSavedItems(p?.details?.saved_items ?? []);
+      setTimelineStatus(p?.details?.timeline_status ?? {});
       setLoading(false);
     });
   }, [id]);
+
+  useEffect(() => {
+    if (titleEditing && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [titleEditing]);
 
   const persistDetails = async (partial: Partial<PlanDetails>) => {
     const current = plan?.details ?? {};
     const merged = { ...current, ...partial };
     await supabase.from('plans').update({ details: merged }).eq('id', id);
     setPlan(prev => prev ? { ...prev, details: merged } : prev);
+  };
+
+  const updateTitle = async () => {
+    const t = editedTitle.trim();
+    if (!t || t === plan?.title) { setTitleEditing(false); return; }
+    await supabase.from('plans').update({ title: t }).eq('id', id);
+    setPlan(prev => prev ? { ...prev, title: t } : prev);
+    setTitleEditing(false);
+    fireToast('タイトルを更新しました');
+  };
+
+  const cycleTaskStatus = async (key: string) => {
+    const current = timelineStatus[key] ?? 'none';
+    const next = STATUS_ORDER[(STATUS_ORDER.indexOf(current) + 1) % STATUS_ORDER.length];
+    const updated = { ...timelineStatus, [key]: next };
+    setTimelineStatus(updated);
+    await persistDetails({ timeline_status: updated });
   };
 
   const addNote = async () => {
@@ -137,6 +196,7 @@ export default function PlanDetailPage() {
         setPlan(data.plan);
         setNotes(data.plan.details?.notes ?? []);
         setSavedItems(data.plan.details?.saved_items ?? []);
+        setTimelineStatus(data.plan.details?.timeline_status ?? {});
         setShowRegenForm(false);
         setAdditionalRequest('');
         fireToast('プランを再提案しました！');
@@ -174,13 +234,21 @@ export default function PlanDetailPage() {
   const budgetLabel = budgetMin ? `${budgetMin}${budgetMax && budgetMax !== budgetMin ? `〜${budgetMax}` : ''}万円` : null;
   const preDeparture = plan.details?.pre_departure ?? {};
   const timeline = plan.details?.timeline ?? [];
+  const firstWeek = plan.details?.first_week ?? [];
+  const yearlyPlan = plan.details?.yearly_plan ?? [];
   const featureSections = Object.entries(preDeparture).map(([key, val]) => ({ key, icon: PRE_ICONS[key] ?? '📌', label: PRE_LABELS[key] ?? key, content: val }));
+
+  // タイムライン進捗集計
+  const allTasks = timeline.flatMap((item, pi) => item.tasks.map((_, ti) => `${pi}-${ti}`));
+  const doneTasks = allTasks.filter(k => timelineStatus[k] === 'done').length;
+  const doingTasks = allTasks.filter(k => timelineStatus[k] === 'doing').length;
+  const progress = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : 0;
 
   return (
     <div className="h-full overflow-y-auto bg-white relative">
       {/* トースト */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-lg animate-fade-in">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-full shadow-lg">
           {toast}
         </div>
       )}
@@ -214,8 +282,32 @@ export default function PlanDetailPage() {
       <div className="flex min-h-0">
         {/* 左：メインコンテンツ */}
         <div className="flex-1 min-w-0 px-6 sm:px-10 py-8">
-          {/* タイトル */}
-          <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-4 leading-snug">{plan.title}</h1>
+
+          {/* タイトル（インライン編集） */}
+          <div className="flex items-start gap-2 mb-4">
+            {titleEditing ? (
+              <div className="flex-1 flex gap-2 items-center">
+                <input
+                  ref={titleInputRef}
+                  value={editedTitle}
+                  onChange={e => setEditedTitle(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') updateTitle(); if (e.key === 'Escape') setTitleEditing(false); }}
+                  className="flex-1 text-xl sm:text-2xl font-bold text-primary border-b-2 border-primary outline-none bg-transparent"
+                />
+                <button onClick={updateTitle} className="text-sm font-semibold text-white bg-primary px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity flex-shrink-0">保存</button>
+                <button onClick={() => setTitleEditing(false)} className="text-sm text-muted px-2 hover:text-primary flex-shrink-0">✕</button>
+              </div>
+            ) : (
+              <>
+                <h1 className="flex-1 text-2xl sm:text-3xl font-bold text-primary leading-snug">{plan.title}</h1>
+                <button
+                  onClick={() => { setEditedTitle(plan.title); setTitleEditing(true); }}
+                  className="flex-shrink-0 mt-1 text-muted hover:text-primary transition-colors text-sm"
+                  title="タイトルを編集"
+                >✏️</button>
+              </>
+            )}
+          </div>
 
           {/* タグ行 */}
           <div className="flex flex-wrap gap-2 mb-6">
@@ -255,6 +347,125 @@ export default function PlanDetailPage() {
             <span className="text-muted text-sm flex-1">このプランについて質問する...</span>
             <span className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm group-hover:opacity-80 transition-opacity">→</span>
           </Link>
+
+          {/* ━━ 到着後1週間プラン ━━ */}
+          {firstWeek.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-base font-bold text-primary mb-1">到着後1週間プラン</h2>
+              <p className="text-xs text-muted mb-4">渡航直後のリアルな1日1日をシミュレート</p>
+              <div className="flex flex-col gap-3">
+                {firstWeek.map((item, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold ${DAY_COLORS[i % DAY_COLORS.length]}`}>
+                        {i + 1}
+                      </div>
+                      {i < firstWeek.length - 1 && <div className="w-px flex-1 bg-border mt-1.5" />}
+                    </div>
+                    <div className="pb-3 pt-0.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] font-semibold text-muted uppercase tracking-wide">{item.day}</span>
+                      </div>
+                      <p className="text-sm font-bold text-primary leading-snug">{item.highlight}</p>
+                      <div className="mt-1.5 flex items-start gap-1.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                        <span className="text-amber-500 text-xs flex-shrink-0 mt-0.5">💡</span>
+                        <p className="text-xs text-amber-800 leading-relaxed">{item.tips}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ━━ 月別ライフプラン ━━ */}
+          {yearlyPlan.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-base font-bold text-primary mb-1">月別ライフプラン</h2>
+              <p className="text-xs text-muted mb-4">あなただけの{duration}の過ごし方</p>
+              <div className="flex flex-col gap-3">
+                {yearlyPlan.map((item, i) => (
+                  <div key={i} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                      </div>
+                      {i < yearlyPlan.length - 1 && <div className="w-px flex-1 bg-border mt-1.5" />}
+                    </div>
+                    <div className="pb-3 pt-0.5 flex-1 min-w-0">
+                      <span className="text-[10px] font-semibold text-muted uppercase tracking-wide">{item.month}</span>
+                      <p className="text-sm font-bold text-primary mt-0.5 leading-snug">{item.title}</p>
+                      <p className="text-xs text-muted leading-relaxed mt-1">{item.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ━━ 準備タイムライン ━━ */}
+          {timeline.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-bold text-primary">準備タイムライン</h2>
+                  {allTasks.length > 0 && (
+                    <p className="text-xs text-muted mt-0.5">
+                      {doneTasks}/{allTasks.length} 完了
+                      {doingTasks > 0 && <span className="ml-2 text-amber-600">{doingTasks}件進行中</span>}
+                    </p>
+                  )}
+                </div>
+                {allTasks.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-primary">{progress}%</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-4">
+                {timeline.map((item, pi) => (
+                  <div key={pi} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${
+                        item.tasks.every((_, ti) => timelineStatus[`${pi}-${ti}`] === 'done')
+                          ? 'bg-emerald-400' : item.tasks.some((_, ti) => timelineStatus[`${pi}-${ti}`] === 'doing')
+                          ? 'bg-amber-400' : 'bg-primary'
+                      }`} />
+                      {pi < timeline.length - 1 && <div className="w-px flex-1 bg-border mt-2" />}
+                    </div>
+                    <div className="pb-4 flex-1 min-w-0">
+                      <p className="text-sm font-bold text-primary">{item.period}</p>
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        {item.tasks.map((task, ti) => {
+                          const key = `${pi}-${ti}`;
+                          const status = timelineStatus[key] ?? 'none';
+                          const cfg = STATUS_CONFIG[status];
+                          return (
+                            <button
+                              key={ti}
+                              onClick={() => cycleTaskStatus(key)}
+                              className={`flex items-center gap-2 text-left rounded-xl px-3 py-2 border transition-all hover:shadow-sm ${cfg.bg} ${status === 'done' ? 'border-emerald-200' : status === 'doing' ? 'border-amber-200' : 'border-gray-200'}`}
+                            >
+                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                              <span className={`text-xs flex-1 leading-snug ${status === 'done' ? 'line-through text-gray-400' : 'text-primary'}`}>{task}</span>
+                              <span className={`text-[9px] font-semibold flex-shrink-0 ${cfg.text}`}>{cfg.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted mt-2">タップでステータスを切り替え（未着手 → 準備中 → 完了）</p>
+            </div>
+          )}
 
           {/* ━━ カスタマイズ ━━ */}
           <div className="mb-8">
@@ -359,29 +570,6 @@ export default function PlanDetailPage() {
               </div>
             </div>
           </div>
-
-          {/* タイムライン */}
-          {timeline.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-base font-bold text-primary mb-4">準備タイムライン</h2>
-              <div className="flex flex-col gap-4">
-                {timeline.map((item, i) => (
-                  <div key={i} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
-                      {i < timeline.length - 1 && <div className="w-px flex-1 bg-border mt-2" />}
-                    </div>
-                    <div className="pb-4">
-                      <p className="text-sm font-bold text-primary">{item.period}</p>
-                      <ul className="mt-1 flex flex-col gap-0.5">
-                        {item.tasks.map((task, j) => <li key={j} className="text-sm text-muted">・{task}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 右：渡航前準備 + 都市画像 */}
