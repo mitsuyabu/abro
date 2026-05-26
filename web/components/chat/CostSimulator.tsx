@@ -182,17 +182,25 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const effWks = useMemo(() => getEffectiveWeeks(phases, total), [phases, total]);
   const costs  = useMemo(() => calcCosts(city, total, school, phases, effWks), [city, total, school, phases, effWks]);
 
+  // 家賃行のサブラベル（滞在タイプと週数の組み合わせ）
+  const rentSublabel = useMemo(() => {
+    const parts = phases
+      .map((p, i) => effWks[i] > 0 ? `${ACC_FULL[p.type]}${effWks[i]}週` : null)
+      .filter(Boolean);
+    return parts.join(' + ');
+  }, [phases, effWks]);
+
   // 費用行（key 付き）
   const rowData = useMemo(() => [
-    { key: 'flights',   label: '✈️ 航空券（片道目安）', value: costs.flights  },
-    { key: 'visa',      label: '📄 ビザ申請費',          value: costs.visa     },
-    ...(costs.school > 0 ? [{ key: 'school',    label: '🎓 語学学校費',  value: costs.school    }] : []),
-    { key: 'rent',      label: '🏠 家賃・滞在費',         value: costs.rent     },
-    ...(costs.food > 0   ? [{ key: 'food',      label: '🍽️ 食費',       value: costs.food      }] : []),
-    { key: 'transport', label: '🚌 交通費',               value: costs.transport },
-    { key: 'insurance', label: '🛡️ 海外保険',            value: costs.insurance },
-    { key: 'misc',      label: '📱 通信・娯楽',           value: costs.misc     },
-  ], [costs]);
+    { key: 'flights',   label: '✈️ 航空券（片道目安）', value: costs.flights,   sublabel: undefined },
+    { key: 'visa',      label: '📄 ビザ申請費',          value: costs.visa,      sublabel: undefined },
+    ...(costs.school > 0 ? [{ key: 'school',    label: '🎓 語学学校費',  value: costs.school,    sublabel: undefined }] : []),
+    { key: 'rent',      label: '🏠 家賃・滞在費',         value: costs.rent,      sublabel: rentSublabel || undefined },
+    ...(costs.food > 0   ? [{ key: 'food',      label: '🍽️ 食費',       value: costs.food,      sublabel: undefined }] : []),
+    { key: 'transport', label: '🚌 交通費',               value: costs.transport, sublabel: undefined },
+    { key: 'insurance', label: '🛡️ 海外保険',            value: costs.insurance, sublabel: undefined },
+    { key: 'misc',      label: '📱 通信・娯楽',           value: costs.misc,      sublabel: undefined },
+  ], [costs, rentSublabel]);
 
   // 有効な項目だけの合計（AUD）
   const effectiveGrandAUD = rowData
@@ -461,9 +469,14 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
               return (
                 <div key={row.key} className={`flex items-center gap-2 transition-opacity ${isOff ? 'opacity-40' : ''}`}>
                   <Toggle on={!isOff} onToggle={() => toggleItem(row.key)} />
-                  <span className={`text-xs text-primary/70 flex-1 min-w-0 truncate ${isOff ? 'line-through' : ''}`}>
-                    {row.label}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-xs text-primary/70 block truncate ${isOff ? 'line-through' : ''}`}>
+                      {row.label}
+                    </span>
+                    {row.sublabel && !isOff && (
+                      <span className="text-[10px] text-muted/70 block truncate">{row.sublabel}</span>
+                    )}
+                  </div>
                   <div className={`text-right flex-shrink-0 transition-all ${isOff ? 'invisible' : ''}`}>
                     <div className="text-xs font-semibold text-primary">{jpy(row.value)}</div>
                     <div className="text-[10px] text-muted">{aud(row.value)}</div>

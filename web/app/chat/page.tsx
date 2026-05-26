@@ -164,14 +164,20 @@ function lsDeleteSession(id: string): void {
 function detectCostSimIntent(userMsg: string, aiMsg: string): boolean {
   const simWords  = ['シミュレーション', 'シミュレート', 'シミュして', 'シミュお願', '計算して', '計算お願', '見積', '試算'];
   const costWords = ['費用', 'コスト', '生活費', 'いくら', '予算', '料金', 'お金'];
+  const queryWords = ['教えて', '知りたい', 'かかる', 'かかります', '？', '?', 'くらい', 'どのくらい', '目安', 'どれくらい'];
+  const contextWords = ['留学', 'ワーホリ', '渡航', 'オーストラリア', '海外'];
   const userHasSim  = simWords.some(p => userMsg.includes(p));
   const userHasCost = costWords.some(p => userMsg.includes(p));
-  // ユーザーが「費用 × シミュレーション」を組み合わせて言及
+  const userHasQuery = queryWords.some(p => userMsg.includes(p));
+  const userHasCtx  = contextWords.some(p => userMsg.includes(p));
   if (userHasSim && userHasCost) return true;
-  // 「シミュレーション」だけでも留学/ワーホリ文脈なら十分
-  if (userHasSim && (userMsg.includes('留学') || userMsg.includes('ワーホリ') || userMsg.includes('渡航'))) return true;
-  // AI がシミュレーターを提示・言及
+  if (userHasSim && userHasCtx) return true;
+  // 費用についての質問形式だけでもシミュレーターを開く
+  if (userHasCost && userHasQuery) return true;
+  if (userHasCost && userHasCtx) return true;
+  // AI がシミュレーターを提示・言及、または費用の数字を列挙
   if (aiMsg.includes('シミュレーター') || aiMsg.includes('費用シミュレーション') || aiMsg.includes('費用を計算')) return true;
+  if (aiMsg.includes('週あたり') && (aiMsg.includes('AUD') || aiMsg.includes('円'))) return true;
   return false;
 }
 
@@ -441,23 +447,31 @@ function detectSidebarContext(content: string, userMessage: string, allSchools: 
 }
 
 function detectQuickSelect(content: string): QuickSelectType {
+  // パターンの近く（前後80文字以内）に疑問符があるか確認
+  const isAsking = (pattern: string) => {
+    const idx = content.indexOf(pattern);
+    if (idx === -1) return false;
+    const window = content.slice(Math.max(0, idx - 30), idx + pattern.length + 80);
+    return window.includes('？') || window.includes('?');
+  };
+
   const schoolPatterns = [
-    '学校に通う期間', '語学学校の期間', '通う期間', '何ヶ月通', '就学期間', '通学期間',
-    '語学学校に通う', '学校期間',
+    '学校に通う期間', '語学学校の期間', '何ヶ月通', '就学期間', '通学期間',
+    '学校期間はどのくらい', '語学学校には何ヶ月', '通う期間はどのくらい',
   ];
   const stayPatterns = [
-    '滞在期間', 'どのくらい滞在', '何ヶ月滞在', '留学期間', 'ワーホリ期間',
-    'どのくらいの期間', '期間を考えて', '期間はどのくらい', '何ヶ月くらい',
-    '期間について', 'どれくらいの期間', '何ヶ月お', '何ヶ月間',
+    'どのくらい滞在', '何ヶ月滞在', 'どのくらいの期間', '期間はどのくらい',
+    '何ヶ月くらい滞在', 'どれくらいの期間', '留学期間はどのくらい', 'ワーホリ期間は',
+    '期間を教えてください', '期間はお決まり', '期間は決まって',
   ];
   const monthPatterns = [
     'いつ頃', '何月', '出発時期', '行く時期', '渡航時期', 'いつ出発',
     '何月ごろ', '何月から', '何月に行', '時期はいつ', '出発はいつ', 'いつから',
   ];
 
-  if (schoolPatterns.some(p => content.includes(p))) return 'school-duration';
-  if (stayPatterns.some(p => content.includes(p))) return 'stay-duration';
-  if (monthPatterns.some(p => content.includes(p))) return 'month';
+  if (schoolPatterns.some(p => isAsking(p))) return 'school-duration';
+  if (stayPatterns.some(p => isAsking(p))) return 'stay-duration';
+  if (monthPatterns.some(p => isAsking(p))) return 'month';
   return null;
 }
 
