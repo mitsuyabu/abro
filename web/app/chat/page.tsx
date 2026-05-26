@@ -278,51 +278,68 @@ function InlineCityCards({ cities, onSend }: { cities: CityItem[]; onSend: (text
   );
 }
 
-function InlineSchoolCards({ schools, onSelectSchool }: { schools: SchoolItem[]; onSelectSchool: (school: SchoolItem) => void }) {
+function InlineSchoolCards({
+  schools,
+  onSelectSchool,
+  onAskSchool,
+}: {
+  schools: SchoolItem[];
+  onSelectSchool: (school: SchoolItem) => void;
+  onAskSchool: (school: SchoolItem) => void;
+}) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
       {schools.map(school => {
         const photo = school.google_photos?.[0];
         return (
-          <button
+          <div
             key={school.id}
-            onClick={() => onSelectSchool(school)}
-            className="flex-shrink-0 w-64 rounded-2xl border border-border bg-white shadow-sm hover:shadow-md hover:scale-[1.01] transition-all text-left overflow-hidden"
+            className="flex-shrink-0 w-64 rounded-2xl border border-border bg-white shadow-sm hover:shadow-md transition-all overflow-hidden"
           >
-            {/* 画像 */}
-            <div className="relative h-36 bg-gray-100">
-              {photo ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={photo} alt={school.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-3xl">🎓</div>
-              )}
-              {school.is_partner && (
-                <span className="absolute top-2 left-2 text-[9px] bg-primary text-white px-2 py-0.5 rounded-full">提携校</span>
-              )}
-              {school.rating != null && (
-                <span className="absolute top-2 right-2 text-[11px] font-semibold bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-amber-500">
-                  ★ {Number(school.rating).toFixed(1)}
-                </span>
-              )}
-            </div>
-            {/* コンテンツ */}
-            <div className="p-3">
-              <div className="text-xs font-bold text-primary leading-snug line-clamp-2">{school.name}</div>
-              <div className="text-[10px] text-muted mt-0.5">{school.city} · {school.type}</div>
-              {school.review_count != null && (
-                <div className="text-[10px] text-muted mt-0.5">{Number(school.review_count).toLocaleString()}件のレビュー</div>
-              )}
-              {school.fee_per_week && (
-                <div className="text-sm font-bold text-primary mt-1.5">
-                  ¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span>
-                </div>
-              )}
-              <div className="mt-2 w-full bg-primary text-white text-[11px] font-semibold py-1.5 rounded-xl text-center">
-                詳細を見る →
+            {/* カード本体タップ → チャットで説明 */}
+            <button
+              onClick={() => onAskSchool(school)}
+              className="w-full text-left block"
+            >
+              <div className="relative h-36 bg-gray-100">
+                {photo ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={photo} alt={school.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-3xl">🎓</div>
+                )}
+                {school.is_partner && (
+                  <span className="absolute top-2 left-2 text-[9px] bg-primary text-white px-2 py-0.5 rounded-full">提携校</span>
+                )}
+                {school.rating != null && (
+                  <span className="absolute top-2 right-2 text-[11px] font-semibold bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full text-amber-500">
+                    ★ {Number(school.rating).toFixed(1)}
+                  </span>
+                )}
               </div>
+              <div className="p-3 pb-2">
+                <div className="text-xs font-bold text-primary leading-snug line-clamp-2">{school.name}</div>
+                <div className="text-[10px] text-muted mt-0.5">{school.city} · {school.type}</div>
+                {school.review_count != null && (
+                  <div className="text-[10px] text-muted mt-0.5">{Number(school.review_count).toLocaleString()}件のレビュー</div>
+                )}
+                {school.fee_per_week && (
+                  <div className="text-sm font-bold text-primary mt-1.5">
+                    ¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span>
+                  </div>
+                )}
+              </div>
+            </button>
+            {/* 詳しく見る → サイドバー */}
+            <div className="px-3 pb-3">
+              <button
+                onClick={() => onSelectSchool(school)}
+                className="w-full bg-primary/10 text-primary text-[11px] font-semibold py-1.5 rounded-xl text-center hover:bg-primary hover:text-white transition-all"
+              >
+                詳しく見る →
+              </button>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>
@@ -403,9 +420,16 @@ function cityIsFocused(cityName: string, content: string): boolean {
 }
 
 function detectSidebarContext(content: string, userMessage: string, allSchools: SchoolItem[]): SidebarContext {
-  const cities = CITY_DATA.filter(c =>
-    userMessage.includes(c.name) || cityIsFocused(c.name, content)
+  // AI が複数都市をリスト形式で提案している場合はすべて表示
+  const allMentioned = CITY_DATA.filter(c => content.includes(c.name) || userMessage.includes(c.name));
+  const isListingCities = allMentioned.length >= 2 && (
+    content.includes('以下') || content.includes('次の') || content.includes('候補') ||
+    content.includes('おすすめ') || content.includes('ご紹介') || content.includes('比較') ||
+    /[①②③④⑤⑥]/.test(content)
   );
+  const cities = isListingCities
+    ? allMentioned
+    : CITY_DATA.filter(c => userMessage.includes(c.name) || cityIsFocused(c.name, content));
 
   const cityCountryNames = new Set(cities.map(c => c.country));
   const countries = COUNTRY_DATA.filter(c => content.includes(c.name) && !cityCountryNames.has(c.name));
@@ -589,6 +613,7 @@ export default function ChatPage() {
 
   // 学校絞り込み条件
   const [schoolPreferences, setSchoolPreferences] = useState<Set<string>>(new Set());
+  const [schoolChipsHidden, setSchoolChipsHidden] = useState(false);
 
   // セッション管理
   const sessionIdRef = useRef<string>(generateId());
@@ -656,6 +681,8 @@ export default function ChatPage() {
     msgCountRef.current = 0;
     setShowSessionDropdown(false);
     setSessions(lsGetSessions());
+    setSchoolChipsHidden(false);
+    setSchoolPreferences(new Set());
   };
 
   const handleLoadSession = (id: string) => {
@@ -711,6 +738,7 @@ export default function ChatPage() {
 
   const handleSchoolPreferenceSearch = () => {
     if (schoolPreferences.size === 0) return;
+    setSchoolChipsHidden(true);
     const conditions = SCHOOL_PREF_OPTIONS
       .filter(p => schoolPreferences.has(p.id))
       .map(p => p.prompt)
@@ -1070,8 +1098,11 @@ export default function ChatPage() {
                                 setSidebarFocusedSchool(school);
                                 setShowRightPanel(true);
                               }}
+                              onAskSchool={(school) => {
+                                handleSend(`${school.name}（${school.city}）について詳しく教えてください。`);
+                              }}
                             />
-                            {msg.id === lastSchoolMsgId && (
+                            {msg.id === lastSchoolMsgId && !schoolChipsHidden && (
                               <SchoolPreferenceChips
                                 selected={schoolPreferences}
                                 onToggle={toggleSchoolPreference}

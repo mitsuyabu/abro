@@ -49,6 +49,13 @@ const TOKYO_COSTS = {
 } as const;
 type TokyoType = keyof typeof TOKYO_COSTS;
 
+type LifeStyle = 'budget' | 'standard' | 'luxury';
+const LIFESTYLE: Record<LifeStyle, { label: string; emoji: string; desc: string; foodMul: number; miscMul: number }> = {
+  budget:   { label: '節約',  emoji: '💰', desc: '自炊・シェア中心',     foodMul: 0.70, miscMul: 0.55 },
+  standard: { label: '通常',  emoji: '😊', desc: 'バランス重視',        foodMul: 1.00, miscMul: 1.00 },
+  luxury:   { label: '贅沢',  emoji: '✨', desc: '外食・アクティビティ多め', foodMul: 1.45, miscMul: 1.80 },
+};
+
 const ACC_SHORT: Record<AccType, string> = { homestay: 'ホームステイ', sharehouse: 'シェア', apartment: 'APT' };
 const ACC_FULL:  Record<AccType, string> = { homestay: 'ホームステイ', sharehouse: 'シェアハウス', apartment: 'アパート' };
 const ACC_SUB:   Record<AccType, string> = { homestay: '食事込み', sharehouse: '自炊', apartment: '自炊' };
@@ -142,6 +149,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const [flashTotal, setFlashTotal]   = useState(false);
   const [tokyoType, setTokyoType]     = useState<TokyoType>('sharehouse');
   const [disabledItems, setDisabledItems] = useState<Set<string>>(new Set());
+  const [lifeStyle, setLifeStyle]     = useState<LifeStyle>('standard');
 
   const flash = (field: string) => {
     setFlashField(field);
@@ -182,6 +190,16 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   const effWks = useMemo(() => getEffectiveWeeks(phases, total), [phases, total]);
   const costs  = useMemo(() => calcCosts(city, total, school, phases, effWks), [city, total, school, phases, effWks]);
 
+  // ライフスタイル倍率を食費・娯楽に適用
+  const effectiveCosts = useMemo(() => {
+    const mul = LIFESTYLE[lifeStyle];
+    return {
+      ...costs,
+      food: costs.food * mul.foodMul,
+      misc: costs.misc * mul.miscMul,
+    };
+  }, [costs, lifeStyle]);
+
   // 家賃行のサブラベル（滞在タイプと週数の組み合わせ）
   const rentSublabel = useMemo(() => {
     const parts = phases
@@ -192,15 +210,15 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
 
   // 費用行（key 付き）
   const rowData = useMemo(() => [
-    { key: 'flights',   label: '✈️ 航空券（片道目安）', value: costs.flights,   sublabel: undefined },
-    { key: 'visa',      label: '📄 ビザ申請費',          value: costs.visa,      sublabel: undefined },
-    ...(costs.school > 0 ? [{ key: 'school',    label: '🎓 語学学校費',  value: costs.school,    sublabel: undefined }] : []),
-    { key: 'rent',      label: '🏠 家賃・滞在費',         value: costs.rent,      sublabel: rentSublabel || undefined },
-    ...(costs.food > 0   ? [{ key: 'food',      label: '🍽️ 食費',       value: costs.food,      sublabel: undefined }] : []),
-    { key: 'transport', label: '🚌 交通費',               value: costs.transport, sublabel: undefined },
-    { key: 'insurance', label: '🛡️ 海外保険',            value: costs.insurance, sublabel: undefined },
-    { key: 'misc',      label: '📱 通信・娯楽',           value: costs.misc,      sublabel: undefined },
-  ], [costs, rentSublabel]);
+    { key: 'flights',   label: '✈️ 航空券（片道目安）', value: effectiveCosts.flights,   sublabel: undefined },
+    { key: 'visa',      label: '📄 ビザ申請費',          value: effectiveCosts.visa,      sublabel: undefined },
+    ...(effectiveCosts.school > 0 ? [{ key: 'school',    label: '🎓 語学学校費',  value: effectiveCosts.school,    sublabel: undefined }] : []),
+    { key: 'rent',      label: '🏠 家賃・滞在費',         value: effectiveCosts.rent,      sublabel: rentSublabel || undefined },
+    ...(effectiveCosts.food > 0 ? [{ key: 'food',        label: '🍽️ 食費',       value: effectiveCosts.food,      sublabel: undefined }] : []),
+    { key: 'transport', label: '🚌 交通費',               value: effectiveCosts.transport, sublabel: undefined },
+    { key: 'insurance', label: '🛡️ 海外保険',            value: effectiveCosts.insurance, sublabel: undefined },
+    { key: 'misc',      label: '📱 通信・娯楽',           value: effectiveCosts.misc,      sublabel: undefined },
+  ], [effectiveCosts, rentSublabel]);
 
   // 有効な項目だけの合計（AUD）
   const effectiveGrandAUD = rowData
@@ -253,11 +271,11 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
   // 上部バー用（無効項目を除いた比率）
   const getEff = (key: string, val: number) => disabledItems.has(key) ? 0 : val;
   const barData = [
-    { value: getEff('flights', costs.flights) + getEff('visa', costs.visa), color: 'bg-orange-300', label: '渡航・ビザ' },
-    { value: getEff('school', costs.school),                                 color: 'bg-amber-400',  label: '学校' },
-    { value: getEff('rent', costs.rent),                                     color: 'bg-primary',    label: '家賃' },
-    { value: getEff('food', costs.food),                                     color: 'bg-emerald-400',label: '食費' },
-    { value: getEff('transport', costs.transport) + getEff('insurance', costs.insurance) + getEff('misc', costs.misc), color: 'bg-slate-300', label: '生活費' },
+    { value: getEff('flights', effectiveCosts.flights) + getEff('visa', effectiveCosts.visa), color: 'bg-orange-300', label: '渡航・ビザ' },
+    { value: getEff('school', effectiveCosts.school),                                          color: 'bg-amber-400',  label: '学校' },
+    { value: getEff('rent', effectiveCosts.rent),                                              color: 'bg-primary',    label: '家賃' },
+    { value: getEff('food', effectiveCosts.food),                                              color: 'bg-emerald-400',label: '食費' },
+    { value: getEff('transport', effectiveCosts.transport) + getEff('insurance', effectiveCosts.insurance) + getEff('misc', effectiveCosts.misc), color: 'bg-slate-300', label: '生活費' },
   ].filter(s => s.value > 0);
 
   const flashCls = 'ring-2 ring-primary/30 bg-primary/[0.03] rounded-xl p-1.5 -mx-1.5';
@@ -451,7 +469,7 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
 
         {/* 費用内訳 */}
         <div className="px-4 pt-4 pb-6">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="text-[11px] font-semibold text-muted uppercase tracking-wide">費用内訳（目安）</div>
             {hasDisabled && (
               <button
@@ -461,6 +479,20 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
                 すべて有効に戻す
               </button>
             )}
+          </div>
+
+          {/* ライフスタイル選択 */}
+          <div className="flex gap-1.5 mb-3">
+            {(Object.keys(LIFESTYLE) as LifeStyle[]).map(ls => (
+              <button key={ls} onClick={() => setLifeStyle(ls)}
+                className={`flex-1 py-1.5 rounded-xl text-center border transition-all ${
+                  lifeStyle === ls ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-muted border-border hover:border-primary/40 hover:bg-primary/5'
+                }`}>
+                <div className="text-sm leading-none">{LIFESTYLE[ls].emoji}</div>
+                <div className={`text-[10px] font-semibold mt-0.5 ${lifeStyle === ls ? 'text-white' : 'text-primary'}`}>{LIFESTYLE[ls].label}</div>
+                <div className={`text-[9px] leading-tight mt-0.5 ${lifeStyle === ls ? 'text-white/70' : 'text-muted/60'}`}>{LIFESTYLE[ls].desc}</div>
+              </button>
+            ))}
           </div>
 
           <div className="space-y-2">
@@ -509,8 +541,8 @@ export function CostSimulator({ onClose, chatSync }: { onClose: () => void; chat
               <div className="text-[10px] text-muted">航空券・ビザ・学校を除く</div>
             </div>
             <div className="text-right">
-              <div className="text-base font-bold text-primary">{jpy(costs.weeklyAvg)}</div>
-              <div className="text-[10px] text-muted">{aud(costs.weeklyAvg)}/週</div>
+              <div className="text-base font-bold text-primary">{jpy(total > 0 ? (effectiveCosts.rent + effectiveCosts.food + effectiveCosts.transport + effectiveCosts.insurance + effectiveCosts.misc) / total : 0)}</div>
+              <div className="text-[10px] text-muted">{aud(total > 0 ? (effectiveCosts.rent + effectiveCosts.food + effectiveCosts.transport + effectiveCosts.insurance + effectiveCosts.misc) / total : 0)}/週</div>
             </div>
           </div>
 
