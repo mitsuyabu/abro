@@ -1,11 +1,12 @@
 import OpenAI from 'openai';
 import { createClient } from '@/utils/supabase/server';
+import { fetchCitySpots, detectCityEn, spotsToPromptText, type CitySpot } from '@/utils/googlePlaces';
 
 export const dynamic = 'force-dynamic';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const GENERATE_PROMPT = `あなたはAbroの留学・ワーホリプランナーAIです。
+const BASE_PROMPT = `あなたはAbroの留学・ワーホリプランナーAIです。
 以下の会話をもとに、ユーザーに最適な渡航プランを作成してください。
 
 以下のJSON形式で返してください（コードブロック不要、JSONのみ）：
@@ -42,7 +43,7 @@ const GENERATE_PROMPT = `あなたはAbroの留学・ワーホリプランナー
     {"day": "到着日", "highlight": "ホームステイ先へ移動・チェックイン", "tips": "時差ボケに注意。荷物を整理して早めに就寝。"},
     {"day": "2日目", "highlight": "語学学校のオリエンテーション", "tips": "クラスメートに積極的に話しかけよう！"},
     {"day": "3日目", "highlight": "街を散策・スーパーに行ってみよう", "tips": "地元のスーパーでオーストラリアの食材を探そう。"},
-    {"day": "4日目", "highlight": "通学ルートと交通機関を把握", "tips": "Opalカード（シドニー）などのICカードを使いこなそう。"},
+    {"day": "4日目", "highlight": "通学ルートと交通機関を把握", "tips": "ICカードを使いこなそう。"},
     {"day": "5日目", "highlight": "クラスメートとランチに挑戦", "tips": "「一緒にランチどう？」の一言が友達づくりの第一歩。"},
     {"day": "6日目（週末）", "highlight": "近くの観光スポットへ", "tips": "疲れが溜まりやすい時期。無理せず楽しもう。"},
     {"day": "7日目（週末）", "highlight": "1週間を振り返り・次週の計画", "tips": "不安なことを書き出して解消策を考えよう。"}
@@ -68,19 +69,33 @@ export async function POST(req: Request) {
 
     const { messages } = await req.json() as { messages: { role: string; content: string }[] };
 
+    // 会話からメッセージを組み立て
+    const conversationText = messages
+      .map(m => `${m.role === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`)
+      .join('\n\n');
+
+    // 会話から都市を事前検出してスポット情報を取得（並列）
+    const allText = messages.map(m => m.content).join(' ');
+    const cityEn = detectCityEn(allText);
+
+    const [citySpots] = await Promise.all([
+      cityEn ? fetchCitySpots(cityEn) : Promise.resolve<CitySpot[]>([]),
+    ]);
+
+    // スポット情報をプロンプトに追加
+    const cityJa = cityEn ? Object.entries({ シドニー: 'Sydney', メルボルン: 'Melbourne', ブリスベン: 'Brisbane', ゴールドコースト: 'Gold Coast', ケアンズ: 'Cairns', パース: 'Perth' }).find(([, v]) => v === cityEn)?.[0] ?? cityEn : '';
+    const spotsText = citySpots.length > 0 ? spotsToPromptText(citySpots, cityJa) : '';
+
+    const systemPrompt = BASE_PROMPT + spotsText;
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       max_tokens: 3500,
       temperature: 0.8,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: GENERATE_PROMPT },
-        {
-          role: 'user',
-          content: `以下の会話をもとにプランを作成してください:\n\n${
-            messages.map(m => `${m.role === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`).join('\n\n')
-          }`,
-        },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `以下の会話をもとにプランを作成してください:\n\n${conversationText}` },
       ],
     });
 
@@ -106,6 +121,7 @@ export async function POST(req: Request) {
           timeline: plan.timeline,
           first_week: plan.first_week ?? [],
           yearly_plan: plan.yearly_plan ?? [],
+          city_spots: citySpots,
         },
         status: 'draft',
       })

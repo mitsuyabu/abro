@@ -8,6 +8,16 @@ import { AgentContactModal } from '@/components/AgentContactModal';
 
 type TaskStatus = 'none' | 'doing' | 'done';
 
+interface CitySpot {
+  id: string;
+  name: string;
+  rating?: number;
+  address?: string;
+  mapsUrl?: string;
+  photoName?: string;
+  category: 'tourist' | 'food' | 'daily' | 'nature' | 'weekend';
+}
+
 interface FirstWeekDay {
   day: string;
   highlight: string;
@@ -27,6 +37,7 @@ interface PlanDetails {
   timeline_status?: Record<string, TaskStatus>;
   first_week?: FirstWeekDay[];
   yearly_plan?: YearlyMonth[];
+  city_spots?: CitySpot[];
   notes?: string[];
   saved_items?: { label: string; type: 'school' | 'city' | 'other' }[];
 }
@@ -69,6 +80,57 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; dot: string; bg: string
 const STATUS_ORDER: TaskStatus[] = ['none', 'doing', 'done'];
 
 const DAY_COLORS = ['bg-primary', 'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
+
+// 各日のスポットカテゴリマッピング（0=到着日, 1=2日目... ）
+const DAY_SPOT_CATS: (CitySpot['category'] | null)[] = [null, 'tourist', 'daily', null, 'food', 'tourist', 'nature'];
+
+// キーワードからスポットカテゴリを推定（yearly_plan 用）
+function guessSpotCat(text: string): CitySpot['category'] | null {
+  if (/スーパー|食材|買い物|生活/.test(text))       return 'daily';
+  if (/カフェ|ランチ|レストラン|食事|食べ/.test(text)) return 'food';
+  if (/観光|スポット|ランドマーク|見どころ/.test(text)) return 'tourist';
+  if (/ビーチ|公園|自然|アウトドア/.test(text))       return 'nature';
+  if (/旅行|小旅行|週末|day trip/.test(text))         return 'weekend';
+  return null;
+}
+
+function SpotCards({ spots }: { spots: CitySpot[] }) {
+  if (spots.length === 0) return null;
+  return (
+    <div className="mt-2 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      {spots.slice(0, 4).map(spot => (
+        <a
+          key={spot.id}
+          href={spot.mapsUrl ?? '#'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-shrink-0 group rounded-xl border border-border bg-white hover:border-primary/40 hover:shadow-sm transition-all overflow-hidden w-36"
+        >
+          {spot.photoName ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={`/api/place-photo?name=${encodeURIComponent(spot.photoName)}`}
+              alt={spot.name}
+              className="w-full h-20 object-cover"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className="w-full h-20 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-2xl">
+              {spot.category === 'food' ? '🍽️' : spot.category === 'daily' ? '🛒' : spot.category === 'nature' ? '🌿' : spot.category === 'weekend' ? '🚗' : '📍'}
+            </div>
+          )}
+          <div className="px-2 py-1.5">
+            <p className="text-[11px] font-semibold text-primary leading-tight line-clamp-2">{spot.name}</p>
+            {spot.rating != null && (
+              <p className="text-[10px] text-amber-500 font-medium mt-0.5">★ {spot.rating.toFixed(1)}</p>
+            )}
+            <p className="text-[9px] text-primary/50 mt-0.5 font-medium group-hover:text-primary transition-colors">地図で見る →</p>
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export default function PlanDetailPage() {
   const params = useParams();
@@ -236,6 +298,7 @@ export default function PlanDetailPage() {
   const timeline = plan.details?.timeline ?? [];
   const firstWeek = plan.details?.first_week ?? [];
   const yearlyPlan = plan.details?.yearly_plan ?? [];
+  const citySpots = plan.details?.city_spots ?? [];
   const featureSections = Object.entries(preDeparture).map(([key, val]) => ({ key, icon: PRE_ICONS[key] ?? '📌', label: PRE_LABELS[key] ?? key, content: val }));
 
   // タイムライン進捗集計
@@ -354,26 +417,29 @@ export default function PlanDetailPage() {
               <h2 className="text-base font-bold text-primary mb-1">到着後1週間プラン</h2>
               <p className="text-xs text-muted mb-4">渡航直後のリアルな1日1日をシミュレート</p>
               <div className="flex flex-col gap-3">
-                {firstWeek.map((item, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold ${DAY_COLORS[i % DAY_COLORS.length]}`}>
-                        {i + 1}
+                {firstWeek.map((item, i) => {
+                  const cat = DAY_SPOT_CATS[i] ?? null;
+                  const daySpots = cat ? citySpots.filter(s => s.category === cat) : [];
+                  return (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold ${DAY_COLORS[i % DAY_COLORS.length]}`}>
+                          {i + 1}
+                        </div>
+                        {i < firstWeek.length - 1 && <div className="w-px flex-1 bg-border mt-1.5" />}
                       </div>
-                      {i < firstWeek.length - 1 && <div className="w-px flex-1 bg-border mt-1.5" />}
-                    </div>
-                    <div className="pb-3 pt-0.5 flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
+                      <div className="pb-3 pt-0.5 flex-1 min-w-0">
                         <span className="text-[10px] font-semibold text-muted uppercase tracking-wide">{item.day}</span>
-                      </div>
-                      <p className="text-sm font-bold text-primary leading-snug">{item.highlight}</p>
-                      <div className="mt-1.5 flex items-start gap-1.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                        <span className="text-amber-500 text-xs flex-shrink-0 mt-0.5">💡</span>
-                        <p className="text-xs text-amber-800 leading-relaxed">{item.tips}</p>
+                        <p className="text-sm font-bold text-primary leading-snug mt-0.5">{item.highlight}</p>
+                        <div className="mt-1.5 flex items-start gap-1.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                          <span className="text-amber-500 text-xs flex-shrink-0 mt-0.5">💡</span>
+                          <p className="text-xs text-amber-800 leading-relaxed">{item.tips}</p>
+                        </div>
+                        <SpotCards spots={daySpots} />
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -384,21 +450,26 @@ export default function PlanDetailPage() {
               <h2 className="text-base font-bold text-primary mb-1">月別ライフプラン</h2>
               <p className="text-xs text-muted mb-4">あなただけの{duration}の過ごし方</p>
               <div className="flex flex-col gap-3">
-                {yearlyPlan.map((item, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                {yearlyPlan.map((item, i) => {
+                  const cat = guessSpotCat(item.title + item.detail);
+                  const monthSpots = cat ? citySpots.filter(s => s.category === cat) : [];
+                  return (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                        </div>
+                        {i < yearlyPlan.length - 1 && <div className="w-px flex-1 bg-border mt-1.5" />}
                       </div>
-                      {i < yearlyPlan.length - 1 && <div className="w-px flex-1 bg-border mt-1.5" />}
+                      <div className="pb-3 pt-0.5 flex-1 min-w-0">
+                        <span className="text-[10px] font-semibold text-muted uppercase tracking-wide">{item.month}</span>
+                        <p className="text-sm font-bold text-primary mt-0.5 leading-snug">{item.title}</p>
+                        <p className="text-xs text-muted leading-relaxed mt-1">{item.detail}</p>
+                        <SpotCards spots={monthSpots} />
+                      </div>
                     </div>
-                    <div className="pb-3 pt-0.5 flex-1 min-w-0">
-                      <span className="text-[10px] font-semibold text-muted uppercase tracking-wide">{item.month}</span>
-                      <p className="text-sm font-bold text-primary mt-0.5 leading-snug">{item.title}</p>
-                      <p className="text-xs text-muted leading-relaxed mt-1">{item.detail}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

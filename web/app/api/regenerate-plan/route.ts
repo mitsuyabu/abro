@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { createClient } from '@/utils/supabase/server';
+import { fetchCitySpots, CITY_EN, spotsToPromptText, type CitySpot } from '@/utils/googlePlaces';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,16 @@ export async function POST(req: Request) {
 
     if (fetchErr || !plan) return Response.json({ error: 'Plan not found' }, { status: 404 });
 
+    // 都市スポット取得（既存キャッシュがあれば再利用、なければ取得）
+    let citySpots: CitySpot[] = plan.details?.city_spots ?? [];
+    if (citySpots.length === 0 && plan.destination_city) {
+      const cityEn = CITY_EN[plan.destination_city];
+      if (cityEn) citySpots = await fetchCitySpots(cityEn);
+    }
+    const spotsText = citySpots.length > 0
+      ? spotsToPromptText(citySpots, plan.destination_city ?? '')
+      : '';
+
     // コンテキスト構築
     const currentSummary = [
       `現在のプラン: ${plan.title}`,
@@ -117,7 +128,7 @@ ${currentSummary}${notesText}${itemsText}${additionalText}
       temperature: 0.8,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: SYSTEM_PROMPT + spotsText },
         { role: 'user', content: userMessage },
       ],
     });
@@ -125,7 +136,7 @@ ${currentSummary}${notesText}${itemsText}${additionalText}
     const raw = completion.choices[0]?.message?.content ?? '{}';
     const updated = JSON.parse(raw);
 
-    // DBを更新（notes・saved_items・timeline_status は保持）
+    // DBを更新（notes・saved_items・timeline_status・city_spots は保持）
     const newDetails = {
       duration_label: updated.duration_label ?? plan.details?.duration_label,
       pre_departure: updated.pre_departure ?? plan.details?.pre_departure,
@@ -133,6 +144,7 @@ ${currentSummary}${notesText}${itemsText}${additionalText}
       timeline_status: plan.details?.timeline_status ?? {},
       first_week: updated.first_week ?? plan.details?.first_week ?? [],
       yearly_plan: updated.yearly_plan ?? plan.details?.yearly_plan ?? [],
+      city_spots: citySpots,
       notes: notes ?? plan.details?.notes ?? [],
       saved_items: savedItems ?? plan.details?.saved_items ?? [],
     };
