@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import dynamic from 'next/dynamic';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { DynamicSidebar, SidebarContext, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
+import { DynamicSidebar, SidebarContext, AgentPrefs, COUNTRY_DATA, CITY_DATA, AVATAR_STYLE, SchoolItem, CityItem } from '@/components/chat/DynamicSidebar';
 import { CostSimulator, type ChatSync } from '@/components/chat/CostSimulator';
 import { AgentContactModal } from '@/components/AgentContactModal';
 import { getInitialState, advancePhase, type ConversationState } from '@/utils/conversationManager';
@@ -14,7 +14,7 @@ const SidebarMapMobile = dynamic(() => import('@/components/chat/SidebarMap'), {
 const ACTION_CHIPS = [
   { id: 'plan',  emoji: '✨', label: 'プランを作る',    prompt: 'ワーホリ・留学のプランを一緒に考えたいです。' },
   { id: 'cost',  emoji: '💰', label: '費用シミュレート', prompt: '留学・ワーホリの費用をシミュレーションしたいです。' },
-  { id: 'visa',  emoji: '📄', label: 'ビザについて',    prompt: 'ワーホリ・留学のビザ申請について教えてください。' },
+  { id: 'visa',  emoji: '🎓', label: '留学について教えて', prompt: '留学について教えてください。どんな種類があって、自分に合うものを相談したいです。' },
   { id: 'agent', emoji: '🎓', label: 'エージェント相談', prompt: 'おすすめのエージェントを教えてください。' },
 ];
 
@@ -499,6 +499,23 @@ function detectQuickSelect(content: string): QuickSelectType {
   return null;
 }
 
+function extractAgentPrefs(text: string): AgentPrefs {
+  const t = text.toLowerCase();
+  const prefs: AgentPrefs = {};
+  if (/無料|費用.{0,5}かからない|お金.{0,5}かからない|タダ|無償/.test(t)) {
+    prefs.feeType = 'free';
+  }
+  if (/対面|直接会|店舗|窓口|オフィスに行/.test(t)) {
+    prefs.support = 'inperson';
+  }
+  if (/ワーホリ.{0,5}専門|ワーホリ.{0,5}特化|ワーキングホリデー専門/.test(t)) {
+    prefs.purpose = 'workingholiday';
+  } else if (/語学留学.{0,5}専門|留学.{0,5}専門|語学.{0,5}専門/.test(t)) {
+    prefs.purpose = 'study';
+  }
+  return prefs;
+}
+
 function parseChoices(content: string): string[] {
   const regex = /[①②③④⑤⑥]\s*.{2,25}/g;
   return (content.match(regex) || []).slice(0, 6).map(s => s.trim());
@@ -602,6 +619,7 @@ export default function ChatPage() {
   const [planError, setPlanError] = useState<string | null>(null);
   const [showCostSimulator, setShowCostSimulator] = useState(false);
   const [sidebarContext, setSidebarContext] = useState<SidebarContext>({ countries: [], cities: [], schools: [], showAgents: false });
+  const cumulativeAgentPrefsRef = useRef<AgentPrefs>({});
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
   const [showAgentModal, setShowAgentModal] = useState(false);
@@ -677,6 +695,7 @@ export default function ChatPage() {
     setMessages([]);
     setConversationState(getInitialState());
     setSidebarContext({ countries: [], cities: [], schools: [], showAgents: false });
+    cumulativeAgentPrefsRef.current = {};
     setPlanError(null);
     msgCountRef.current = 0;
     setShowSessionDropdown(false);
@@ -837,7 +856,15 @@ export default function ChatPage() {
 
       const ctx = detectSidebarContext(fullContent, text, allSchools);
       const quickSelect = detectQuickSelect(fullContent);
-      setSidebarContext(ctx);
+
+      // エージェント絞り込み条件を累積
+      if (ctx.showAgents) {
+        const newPrefs = extractAgentPrefs(fullContent + ' ' + text);
+        if (Object.keys(newPrefs).length > 0) {
+          cumulativeAgentPrefsRef.current = { ...cumulativeAgentPrefsRef.current, ...newPrefs };
+        }
+      }
+      setSidebarContext({ ...ctx, agentPrefs: ctx.showAgents ? cumulativeAgentPrefsRef.current : undefined });
       setMessages(prev => prev.map(m => m.id === aiId ? { ...m, context: ctx, quickSelect } : m));
 
       // 費用シミュレーション意図を検出したら自動表示

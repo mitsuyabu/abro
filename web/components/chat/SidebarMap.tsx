@@ -4,7 +4,18 @@ import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { CityItem, SchoolItem } from './DynamicSidebar';
+import type { CityItem, CountryItem, SchoolItem } from './DynamicSidebar';
+
+const COUNTRY_COORDS: Record<string, { center: [number, number]; zoom: number }> = {
+  'オーストラリア': { center: [-25.2744, 133.7751], zoom: 3 },
+  'カナダ':         { center: [56.1304, -106.3468], zoom: 3 },
+  'イギリス':       { center: [55.3781, -3.4360],   zoom: 5 },
+  'ニュージーランド': { center: [-40.9006, 174.8860], zoom: 4 },
+  'フィリピン':     { center: [12.8797, 121.7740],  zoom: 5 },
+  'マルタ':         { center: [35.9375, 14.3754],   zoom: 9 },
+  'アメリカ':       { center: [37.0902, -95.7129],  zoom: 3 },
+  'アイルランド':   { center: [53.1424, -7.6921],   zoom: 6 },
+};
 
 const LOCATION_COORDS: Record<string, [number, number]> = {
   'シドニー':         [-33.8688, 151.2093],
@@ -69,17 +80,17 @@ function makePinIcon(emoji: string, name: string, dotColor: string, scale = 1) {
   });
 }
 
-function FitBounds({ positions }: { positions: [number, number][] }) {
+function FitBounds({ positions, singleZoom = 13 }: { positions: [number, number][]; singleZoom?: number }) {
   const map = useMap();
   useEffect(() => {
     if (positions.length === 0) return;
     if (positions.length === 1) {
-      map.setView(positions[0], 13);
+      map.setView(positions[0], singleZoom);
     } else {
       map.fitBounds(L.latLngBounds(positions), { padding: [70, 70] });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(positions)]);
+  }, [JSON.stringify(positions), singleZoom]);
   return null;
 }
 
@@ -106,9 +117,17 @@ interface Props {
   onSelectCity: (city: CityItem) => void;
   onSelectSchool: (school: SchoolItem) => void;
   hoveredSchoolId?: string;
+  countries?: CountryItem[];
 }
 
-export default function SidebarMap({ cities, schools, onSelectCity, onSelectSchool, hoveredSchoolId }: Props) {
+export default function SidebarMap({ cities, schools, onSelectCity, onSelectSchool, hoveredSchoolId, countries = [] }: Props) {
+  const countryEntries = useMemo(() =>
+    countries
+      .map(country => ({ country, data: COUNTRY_COORDS[country.name] }))
+      .filter((e): e is { country: CountryItem; data: { center: [number, number]; zoom: number } } => !!e.data),
+    [countries]
+  );
+
   const cityEntries = useMemo(() =>
     cities
       .map(city => ({ city, pos: LOCATION_COORDS[city.name] }))
@@ -133,10 +152,19 @@ export default function SidebarMap({ cities, schools, onSelectCity, onSelectScho
     [schools]
   );
 
+  const hasDetailedLocations = cityEntries.length > 0 || schoolEntries.length > 0;
+
   const allPositions = useMemo(
-    () => [...cityEntries.map(e => e.pos), ...schoolEntries.map(e => e.pos)],
-    [cityEntries, schoolEntries]
+    () => [
+      ...cityEntries.map(e => e.pos),
+      ...schoolEntries.map(e => e.pos),
+      ...(hasDetailedLocations ? [] : countryEntries.map(e => e.data.center)),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cityEntries, schoolEntries, countryEntries, hasDetailedLocations]
   );
+
+  const countrySingleZoom = countryEntries.length === 1 ? countryEntries[0].data.zoom : 3;
 
   const cityIcons = useMemo(
     () => Object.fromEntries(cityEntries.map(({ city }) => [city.name, makePinIcon(city.flag, city.name, '#2563EB')])),
@@ -154,15 +182,16 @@ export default function SidebarMap({ cities, schools, onSelectCity, onSelectScho
     [schoolEntries, hoveredSchoolId]
   );
 
-  if (allPositions.length === 0) return null;
+  if (allPositions.length === 0 && countryEntries.length === 0) return null;
 
-  const centerLat = allPositions.reduce((s, p) => s + p[0], 0) / allPositions.length;
-  const centerLng = allPositions.reduce((s, p) => s + p[1], 0) / allPositions.length;
+  const displayPositions = allPositions.length > 0 ? allPositions : countryEntries.map(e => e.data.center);
+  const centerLat = displayPositions.reduce((s, p) => s + p[0], 0) / displayPositions.length;
+  const centerLng = displayPositions.reduce((s, p) => s + p[1], 0) / displayPositions.length;
 
   return (
     <MapContainer
       center={[centerLat, centerLng]}
-      zoom={6}
+      zoom={hasDetailedLocations ? 6 : countrySingleZoom}
       style={{ height: '100%', width: '100%' }}
       zoomControl
       scrollWheelZoom
@@ -171,11 +200,30 @@ export default function SidebarMap({ cities, schools, onSelectCity, onSelectScho
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
       />
-      <FitBounds positions={allPositions} />
+      <FitBounds
+        positions={displayPositions}
+        singleZoom={hasDetailedLocations ? 13 : countrySingleZoom}
+      />
       <FlyToSchool
         entries={schoolEntries.map(e => ({ id: e.school.id, pos: e.pos }))}
         hoveredSchoolId={hoveredSchoolId}
       />
+
+      {/* 国マーカー（都市/学校がない場合のみ表示） */}
+      {!hasDetailedLocations && countryEntries.map(({ country, data }) => (
+        <Marker
+          key={country.name}
+          position={data.center}
+          icon={makePinIcon(country.flag, country.name, '#10B981')}
+        >
+          <Popup>
+            <div style={{ minWidth: '140px', fontFamily: 'sans-serif' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px' }}>{country.flag} {country.name}</div>
+              <div style={{ color: '#888', fontSize: '11px', marginTop: '2px' }}>詳しく話しましょう！</div>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
 
       {cityEntries.map(({ city, pos }) => (
         <Marker

@@ -50,11 +50,18 @@ export interface SchoolItem {
   longitude?: number | null;
 }
 
+export interface AgentPrefs {
+  purpose?: 'study' | 'workingholiday';
+  feeType?: 'free';
+  support?: 'inperson';
+}
+
 export interface SidebarContext {
   countries: CountryItem[];
   cities: CityItem[];
   schools: SchoolItem[];
   showAgents: boolean;
+  agentPrefs?: AgentPrefs;
 }
 
 export const COUNTRY_DATA: CountryItem[] = [
@@ -222,32 +229,80 @@ export const CITY_DATA: CityItem[] = [
   },
 ];
 
-const AGENTS = [
+type AgentPurpose = 'study' | 'workingholiday' | 'both';
+type AgentFee = 'free' | 'paid';
+type AgentSupportType = 'online' | 'inperson';
+
+const AGENTS: Array<{
+  id: number; name: string; specialty: string; description: string;
+  rating: number; reviews: number; badge: string;
+  fee: AgentFee; purpose: AgentPurpose[]; support: AgentSupportType[];
+}> = [
   {
     id: 1,
     name: "スタディ留学センター",
     specialty: "語学留学・大学進学サポート",
+    description: "語学留学・大学進学を中心に手厚くサポート。オンライン無料カウンセリングあり。",
     rating: 4.8,
     reviews: 1240,
     badge: "実績No.1",
+    fee: 'free',
+    purpose: ['study', 'both'],
+    support: ['online', 'inperson'],
   },
   {
     id: 2,
     name: "ワーホリプロ",
     specialty: "ワーキングホリデー専門",
+    description: "ワーホリ専門エージェント。ビザ申請から仕事探しまで一貫サポート。相談無料。",
     rating: 4.7,
     reviews: 892,
     badge: "専門特化",
+    fee: 'free',
+    purpose: ['workingholiday', 'both'],
+    support: ['online'],
   },
   {
     id: 3,
     name: "グローバルEdge",
     specialty: "コスパ重視・初心者向け",
+    description: "初めての海外に特化した伴走型サポート。対面相談も対応。有料プランで更に充実。",
     rating: 4.6,
     reviews: 567,
     badge: "初心者向け",
+    fee: 'paid',
+    purpose: ['study', 'workingholiday', 'both'],
+    support: ['online', 'inperson'],
   },
 ];
+
+function filterAgents(prefs: AgentPrefs | undefined) {
+  if (!prefs || Object.keys(prefs).length === 0) return AGENTS;
+  return AGENTS.filter(agent => {
+    if (prefs.feeType === 'free' && agent.fee !== 'free') return false;
+    if (prefs.purpose === 'study' && !agent.purpose.includes('study') && !agent.purpose.includes('both')) return false;
+    if (prefs.purpose === 'workingholiday' && !agent.purpose.includes('workingholiday') && !agent.purpose.includes('both')) return false;
+    if (prefs.support === 'inperson' && !agent.support.includes('inperson')) return false;
+    return true;
+  });
+}
+
+function AgentPrefsLabel({ prefs }: { prefs: AgentPrefs }) {
+  const labels: string[] = [];
+  if (prefs.feeType === 'free') labels.push('相談無料');
+  if (prefs.purpose === 'study') labels.push('語学留学専門');
+  if (prefs.purpose === 'workingholiday') labels.push('ワーホリ専門');
+  if (prefs.support === 'inperson') labels.push('対面対応あり');
+  if (labels.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+      <span className="text-[9px] text-muted">絞り込み:</span>
+      {labels.map(l => (
+        <span key={l} className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold">{l}</span>
+      ))}
+    </div>
+  );
+}
 
 const AVATAR_STYLE: React.CSSProperties = {};
 
@@ -543,8 +598,10 @@ export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, 
   const [focusedCity, setFocusedCity] = useState<CityItem | null>(null);
   const [internalFocusedSchool, setInternalFocusedSchool] = useState<SchoolItem | null>(null);
   const [hoveredSchool, setHoveredSchool] = useState<SchoolItem | null>(null);
-  const { countries, cities, schools, showAgents } = context;
+  const { countries, cities, schools, showAgents, agentPrefs } = context;
   const hasContext = countries.length > 0 || cities.length > 0 || schools.length > 0 || showAgents;
+  const visibleAgents = filterAgents(agentPrefs);
+  const filteredCount = AGENTS.length - visibleAgents.length;
 
   const focusedSchool = externalFocusedSchool ?? internalFocusedSchool;
   const setFocusedSchool = (school: SchoolItem | null) => {
@@ -585,8 +642,8 @@ export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, 
     );
   }
 
-  // 都市または学校がある場合：全面マップ + 下部カード
-  const hasLocationContext = cities.length > 0 || schools.length > 0;
+  // 都市・学校・国がある場合：全面マップ + 下部カード
+  const hasLocationContext = cities.length > 0 || schools.length > 0 || countries.length > 0;
 
   if (hasLocationContext) {
     return (
@@ -596,6 +653,7 @@ export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, 
           <SidebarMap
             cities={cities}
             schools={schools}
+            countries={countries}
             onSelectCity={setFocusedCity}
             onSelectSchool={setFocusedSchool}
             hoveredSchoolId={hoveredSchool?.id}
@@ -604,6 +662,25 @@ export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, 
 
         {/* 下部カードエリア */}
         <div className="flex-shrink-0 border-t border-border bg-background overflow-y-auto" style={{ maxHeight: '260px' }}>
+          {/* 国カード（都市がない場合） */}
+          {countries.length > 0 && cities.length === 0 && (
+            <div className="px-3 pt-3 pb-1">
+              <p className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">候補の国</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {countries.map(country => (
+                  <div key={country.name} className="flex-shrink-0 w-28 rounded-xl overflow-hidden border border-border/60">
+                    <div className="relative h-16">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={country.images[0]} alt={country.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
+                      <div className="absolute bottom-1 left-1.5 text-white text-[10px] font-bold">{country.flag} {country.name}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 都市カード（横スクロール） */}
           {cities.length > 0 && (
             <div className="px-3 pt-3 pb-1">
@@ -671,18 +748,31 @@ export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, 
           {/* エージェント（ロケーションと同時表示） */}
           {showAgents && (
             <div className="px-3 pb-3">
-              <p className="text-[10px] font-semibold text-muted uppercase tracking-wide mb-2">おすすめエージェント</p>
-              {AGENTS.map((agent) => (
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-semibold text-muted uppercase tracking-wide">おすすめエージェント</p>
+                {filteredCount > 0 && (
+                  <span className="text-[9px] text-muted">{filteredCount}件を除外中</span>
+                )}
+              </div>
+              {agentPrefs && <AgentPrefsLabel prefs={agentPrefs} />}
+              {visibleAgents.map((agent) => (
                 <div key={agent.id} className="bg-white border border-border rounded-xl p-2.5 mb-1.5 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer">
                   <div className="flex items-center justify-between gap-2">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <div className="text-xs font-semibold text-primary">{agent.name}</div>
                       <div className="text-[10px] text-muted">{agent.specialty}</div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {agent.fee === 'free' && <span className="text-[8px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1 py-0.5 rounded-full">相談無料</span>}
+                        {agent.support.includes('inperson') && <span className="text-[8px] bg-blue-50 text-blue-700 border border-blue-200 px-1 py-0.5 rounded-full">対面対応</span>}
+                      </div>
                     </div>
-                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full whitespace-nowrap">{agent.badge}</span>
+                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">{agent.badge}</span>
                   </div>
                 </div>
               ))}
+              {visibleAgents.length === 0 && (
+                <p className="text-xs text-muted text-center py-2">条件に合うエージェントがいません</p>
+              )}
             </div>
           )}
         </div>
@@ -694,25 +784,41 @@ export function DynamicSidebar({ context, focusedSchool: externalFocusedSchool, 
     <div className="flex flex-col overflow-y-auto h-full">
       {showAgents && (
         <div className="px-4 pt-4 pb-2">
-          <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">
-            おすすめエージェント
-          </p>
-          <div className="flex flex-col gap-2">
-            {AGENTS.map((agent) => (
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold text-muted uppercase tracking-wide">おすすめエージェント</p>
+            {filteredCount > 0 && (
+              <span className="text-[10px] text-muted">{filteredCount}件を除外中</span>
+            )}
+          </div>
+          {agentPrefs && <AgentPrefsLabel prefs={agentPrefs} />}
+          <div className="flex flex-col gap-2 mt-2">
+            {visibleAgents.map((agent) => (
               <div
                 key={agent.id}
                 className="bg-white border border-border rounded-xl p-3 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-primary">{agent.name}</div>
                     <div className="text-xs text-muted mt-0.5">{agent.specialty}</div>
+                    <p className="text-[10px] text-muted leading-relaxed mt-1">{agent.description}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {agent.fee === 'free' && <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full">相談無料</span>}
+                      {agent.support.includes('inperson') && <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">対面対応</span>}
+                      {agent.support.includes('online') && <span className="text-[9px] bg-gray-50 text-gray-600 border border-gray-200 px-1.5 py-0.5 rounded-full">オンライン</span>}
+                    </div>
                   </div>
-                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full whitespace-nowrap">{agent.badge}</span>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">{agent.badge}</span>
                 </div>
                 <div className="text-xs text-amber-500 mt-1.5">★ {agent.rating} <span className="text-muted">({agent.reviews.toLocaleString()}件)</span></div>
+                <button className="mt-2 w-full bg-primary text-white text-xs font-semibold py-1.5 rounded-lg hover:opacity-80 transition-opacity">
+                  無料カウンセリングを受ける →
+                </button>
               </div>
             ))}
+            {visibleAgents.length === 0 && (
+              <p className="text-sm text-muted text-center py-4">条件に合うエージェントがいません</p>
+            )}
           </div>
         </div>
       )}
