@@ -143,6 +143,9 @@ export default function PlansPage() {
                       {subtitle && (
                         <p className="text-white/80 text-xs mt-1">{subtitle}</p>
                       )}
+                      <p className="text-white/50 text-[10px] mt-0.5">
+                        {new Date(plan.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
                     </div>
                   </div>
                 </Link>

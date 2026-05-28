@@ -8,6 +8,7 @@ import { DynamicSidebar, SidebarContext, AgentPrefs, COUNTRY_DATA, CITY_DATA, AV
 import { CostSimulator, type ChatSync } from '@/components/chat/CostSimulator';
 import { AgentContactModal } from '@/components/AgentContactModal';
 import { getInitialState, advancePhase, type ConversationState } from '@/utils/conversationManager';
+import { createClient } from '@/utils/supabase/client';
 
 const SidebarMapMobile = dynamic(() => import('@/components/chat/SidebarMap'), { ssr: false });
 
@@ -282,10 +283,14 @@ function InlineSchoolCards({
   schools,
   onSelectSchool,
   onAskSchool,
+  onSaveSchool,
+  savedSchoolIds = new Set(),
 }: {
   schools: SchoolItem[];
   onSelectSchool: (school: SchoolItem) => void;
   onAskSchool: (school: SchoolItem) => void;
+  onSaveSchool?: (school: SchoolItem) => void;
+  savedSchoolIds?: Set<string>;
 }) {
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
@@ -330,14 +335,27 @@ function InlineSchoolCards({
                 )}
               </div>
             </button>
-            {/* 詳しく見る → サイドバー */}
-            <div className="px-3 pb-3">
+            {/* 詳しく見る + 保存 */}
+            <div className="px-3 pb-3 flex gap-2">
               <button
                 onClick={() => onSelectSchool(school)}
-                className="w-full bg-primary/10 text-primary text-[11px] font-semibold py-1.5 rounded-xl text-center hover:bg-primary hover:text-white transition-all"
+                className="flex-1 bg-primary/10 text-primary text-[11px] font-semibold py-1.5 rounded-xl text-center hover:bg-primary hover:text-white transition-all"
               >
                 詳しく見る →
               </button>
+              {onSaveSchool && (
+                <button
+                  onClick={() => onSaveSchool(school)}
+                  title="プランに保存"
+                  className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border text-base transition-all ${
+                    savedSchoolIds.has(school.id)
+                      ? 'border-red-300 bg-red-50 text-red-500'
+                      : 'border-border text-gray-400 hover:border-primary/50 hover:text-primary'
+                  }`}
+                >
+                  {savedSchoolIds.has(school.id) ? '♥' : '♡'}
+                </button>
+              )}
             </div>
           </div>
         );
@@ -548,6 +566,94 @@ const PRE_DEPARTURE_LABELS: Record<string, string> = {
   english_study: '英語学習',
 };
 
+interface PlanOption {
+  id: string;
+  title: string;
+  destination_city: string | null;
+  destination_country: string | null;
+  details: { saved_items?: { label: string; type: string }[] } | null;
+}
+
+function SaveToPlanSheet({
+  school,
+  plans,
+  loading,
+  savedPlanIds,
+  onSave,
+  onClose,
+}: {
+  school: SchoolItem;
+  plans: PlanOption[];
+  loading: boolean;
+  savedPlanIds: Set<string>;
+  onSave: (planId: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative w-full max-w-lg bg-white rounded-t-3xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-gray-200 rounded-full" />
+        </div>
+        <div className="px-5 py-3 border-b border-border">
+          <p className="text-sm font-bold text-primary">プランに保存</p>
+          <p className="text-[11px] text-muted mt-0.5 truncate">{school.name}</p>
+        </div>
+        <div className="max-h-72 overflow-y-auto">
+          {loading ? (
+            <div className="py-8 flex justify-center">
+              <span className="text-muted text-sm">読み込み中...</span>
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="py-8 px-5 text-center">
+              <p className="text-sm text-muted">まだプランがありません</p>
+              <a href="/plans" className="text-xs text-primary mt-2 block">プランを作成する →</a>
+            </div>
+          ) : (
+            plans.map(plan => {
+              const isSaved = savedPlanIds.has(plan.id);
+              return (
+                <button
+                  key={plan.id}
+                  onClick={() => !isSaved && onSave(plan.id)}
+                  disabled={isSaved}
+                  className={`w-full flex items-center justify-between px-5 py-3.5 border-b border-border/40 last:border-0 transition-colors ${
+                    isSaved ? 'bg-primary/5 cursor-default' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-primary truncate max-w-[260px]">{plan.title}</p>
+                    <p className="text-[10px] text-muted mt-0.5">
+                      {plan.destination_city ?? plan.destination_country ?? '行き先未設定'}
+                    </p>
+                  </div>
+                  {isSaved ? (
+                    <span className="text-primary text-xs font-semibold">✓ 保存済み</span>
+                  ) : (
+                    <span className="text-muted text-xs">追加 →</span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+        <div className="px-5 py-4 border-t border-border">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl border border-border text-sm text-muted hover:bg-gray-50 transition-colors"
+          >
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlanCard({ planId, plan }: { planId: string; plan: GeneratedPlan }) {
   const [expanded, setExpanded] = useState(false);
   const budgetMin = Math.round(plan.budget_min_jpy / 10000);
@@ -632,6 +738,13 @@ export default function ChatPage() {
   // 学校絞り込み条件
   const [schoolPreferences, setSchoolPreferences] = useState<Set<string>>(new Set());
   const [schoolChipsHidden, setSchoolChipsHidden] = useState(false);
+
+  // 学校保存機能
+  const [schoolToSave, setSchoolToSave] = useState<SchoolItem | null>(null);
+  const [userPlans, setUserPlans] = useState<PlanOption[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [savedPlanIds, setSavedPlanIds] = useState<Set<string>>(new Set());
+  const [savedSchoolIds, setSavedSchoolIds] = useState<Set<string>>(new Set());
 
   // セッション管理
   const sessionIdRef = useRef<string>(generateId());
@@ -765,6 +878,45 @@ export default function ChatPage() {
     const cityPrefix = conversationState.proposedCity ? `${conversationState.proposedCity}で` : '';
     handleSend(`${cityPrefix}${conditions}語学学校を具体的に教えてください`);
     setSchoolPreferences(new Set());
+  };
+
+  const handleOpenSaveSheet = async (school: SchoolItem) => {
+    setSchoolToSave(school);
+    setPlansLoading(true);
+    setSavedPlanIds(new Set());
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('plans')
+      .select('id, title, destination_city, destination_country, details')
+      .order('created_at', { ascending: false });
+    if (data) {
+      setUserPlans(data as PlanOption[]);
+      const alreadySaved = new Set<string>(
+        (data as PlanOption[])
+          .filter(p => (p.details?.saved_items ?? []).some(item => item.label === school.name && item.type === 'school'))
+          .map(p => p.id)
+      );
+      setSavedPlanIds(alreadySaved);
+    }
+    setPlansLoading(false);
+  };
+
+  const handleConfirmSaveToPlan = async (planId: string) => {
+    if (!schoolToSave) return;
+    const supabase = createClient();
+    const { data: planData } = await supabase
+      .from('plans')
+      .select('details')
+      .eq('id', planId)
+      .single();
+    const currentItems = (planData?.details?.saved_items as { label: string; type: string }[]) ?? [];
+    const updatedDetails = {
+      ...(planData?.details ?? {}),
+      saved_items: [...currentItems, { label: schoolToSave.name, type: 'school' }],
+    };
+    await supabase.from('plans').update({ details: updatedDetails }).eq('id', planId);
+    setSavedPlanIds(prev => new Set([...prev, planId]));
+    setSavedSchoolIds(prev => new Set([...prev, schoolToSave.id]));
   };
 
   // ドロップダウン外クリックで閉じる
@@ -1128,6 +1280,8 @@ export default function ChatPage() {
                               onAskSchool={(school) => {
                                 handleSend(`${school.name}（${school.city}）について詳しく教えてください。`);
                               }}
+                              onSaveSchool={handleOpenSaveSheet}
+                              savedSchoolIds={savedSchoolIds}
                             />
                             {msg.id === lastSchoolMsgId && !schoolChipsHidden && (
                               <SchoolPreferenceChips
@@ -1173,18 +1327,20 @@ export default function ChatPage() {
         {!isEmpty && (
           <div className="border-t border-border bg-white px-4 sm:px-5 py-3 sm:py-4">
             <div className="max-w-2xl mx-auto">
-              {/* モバイル：Mapボタン */}
-              {hasRightContent && (
-                <div className="lg:hidden flex justify-center mb-3">
-                  <button
-                    onClick={() => setShowMapView(true)}
-                    className="flex items-center gap-2 bg-primary text-white rounded-full px-5 py-2 text-sm font-semibold shadow-md hover:opacity-90 transition-opacity"
-                  >
-                    <span>🗺</span>
-                    <span>Map</span>
-                  </button>
-                </div>
-              )}
+              {/* モバイル：Mapボタン（常時表示） */}
+              <div className="lg:hidden flex justify-center mb-3">
+                <button
+                  onClick={() => setShowMapView(true)}
+                  className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md hover:opacity-90 transition-opacity ${
+                    hasRightContent
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-100 text-gray-500 border border-border'
+                  }`}
+                >
+                  <span>🗺</span>
+                  <span>Map</span>
+                </button>
+              </div>
               {/* エージェントバナー（6件以上の会話で表示） */}
               {messages.length >= 6 && !agentBannerDismissed && (
                 <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-2.5 mb-2">
@@ -1260,6 +1416,18 @@ export default function ChatPage() {
           </>
         )}
       </div>
+
+      {/* 学校保存シート */}
+      {schoolToSave && (
+        <SaveToPlanSheet
+          school={schoolToSave}
+          plans={userPlans}
+          loading={plansLoading}
+          savedPlanIds={savedPlanIds}
+          onSave={handleConfirmSaveToPlan}
+          onClose={() => setSchoolToSave(null)}
+        />
+      )}
 
       {/* エージェント相談モーダル */}
       <AgentContactModal
