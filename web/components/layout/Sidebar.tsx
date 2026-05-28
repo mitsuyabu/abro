@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { href: '/creator',     icon: '/icon-creator.png',     label: 'クリエイター' },
 ];
 
-const BOTTOM_NAV_ITEMS = NAV_ITEMS.slice(0, 5);
+const BOTTOM_NAV_ITEMS = NAV_ITEMS.slice(0, 4);
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -171,6 +171,30 @@ export function Sidebar() {
             </Link>
           );
         })}
+        {/* プロフィール・アカウント */}
+        <Link
+          href="/profile"
+          className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors ${
+            pathname.startsWith('/profile') ? 'text-primary' : 'text-gray-400'
+          }`}
+        >
+          {user?.user_metadata?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.user_metadata.avatar_url}
+              alt="account"
+              className="w-6 h-6 rounded-full object-cover"
+              style={{ opacity: pathname.startsWith('/profile') ? 1 : 0.6 }}
+            />
+          ) : (
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              pathname.startsWith('/profile') ? 'bg-primary/20 text-primary' : 'bg-gray-200 text-gray-500'
+            }`}>
+              {user?.email?.[0]?.toUpperCase() ?? '👤'}
+            </div>
+          )}
+          <span className="text-[10px] font-medium leading-none">アカウント</span>
+        </Link>
       </nav>
     </>
   );
