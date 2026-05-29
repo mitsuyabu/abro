@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AgentContactModal } from '@/components/AgentContactModal';
+import type { SchoolItem } from '@/components/chat/DynamicSidebar';
 
 type TaskStatus = 'none' | 'doing' | 'done';
 
@@ -94,6 +95,155 @@ function guessSpotCat(text: string): CitySpot['category'] | null {
   return null;
 }
 
+function SchoolDetailModal({ school, onClose }: { school: SchoolItem; onClose: () => void }) {
+  const photos = school.google_photos?.length ? school.google_photos : (school.images ?? []);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div
+        className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[88vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-10 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center text-white text-sm hover:bg-black/60 transition-colors"
+        >
+          ✕
+        </button>
+        {photos.length > 0 ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photos[0]} alt={school.name} className="w-full h-52 object-cover flex-shrink-0" />
+        ) : (
+          <div className="h-24 bg-gray-100 flex items-center justify-center text-5xl flex-shrink-0">🎓</div>
+        )}
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h2 className="text-base font-bold text-primary leading-snug">{school.name}</h2>
+                {school.is_partner && (
+                  <span className="text-[9px] bg-primary text-white px-2 py-0.5 rounded-full flex-shrink-0">提携校</span>
+                )}
+              </div>
+              <p className="text-xs text-muted mt-0.5">{school.city} · {school.type}</p>
+            </div>
+            {school.fee_per_week != null && (
+              <div className="flex-shrink-0 text-right">
+                <p className="text-base font-bold text-primary">¥{school.fee_per_week.toLocaleString()}</p>
+                <p className="text-[10px] text-muted">/週</p>
+              </div>
+            )}
+          </div>
+          {school.rating != null && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-amber-500 font-bold text-sm">★ {Number(school.rating).toFixed(1)}</span>
+              {school.review_count != null && (
+                <span className="text-xs text-muted">({Number(school.review_count).toLocaleString()}件)</span>
+              )}
+            </div>
+          )}
+          {school.description && (
+            <p className="text-sm text-muted leading-relaxed mt-3">{school.description}</p>
+          )}
+          {school.google_reviews && school.google_reviews.length > 0 && (
+            <div className="mt-4">
+              <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-2">レビュー</p>
+              <div className="flex flex-col gap-2">
+                {school.google_reviews.slice(0, 3).map((review, i) => (
+                  <div key={i} className="bg-gray-50 rounded-xl p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-amber-500 text-xs">{'★'.repeat(review.rating)}</span>
+                      <span className="text-[10px] text-muted">{review.author}</span>
+                    </div>
+                    <p className="text-xs text-muted leading-relaxed line-clamp-3">{review.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {photos.length > 1 && (
+            <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+              {photos.slice(1).map((url, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={url} alt="" className="flex-shrink-0 w-24 h-16 object-cover rounded-xl" />
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex-shrink-0 px-5 py-4 border-t border-border flex gap-2">
+          {school.website ? (
+            <a
+              href={school.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-primary text-white text-sm font-semibold py-3 rounded-xl text-center hover:opacity-80 transition-opacity"
+            >
+              公式サイトを見る →
+            </a>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 px-5 py-3 rounded-xl border border-border text-sm text-muted hover:bg-gray-50 transition-colors"
+          >
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SchoolSavedCard({ school, onTap, onRemove }: { school: SchoolItem; onTap: () => void; onRemove: () => void }) {
+  const photo = school.google_photos?.[0] ?? school.images?.[0];
+  return (
+    <div className="flex-shrink-0 w-56 rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
+      <button onClick={onTap} className="w-full text-left block">
+        <div className="relative h-32 bg-gray-100">
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt={school.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-3xl">🎓</div>
+          )}
+          {school.is_partner && (
+            <span className="absolute top-2 left-2 text-[9px] bg-primary text-white px-2 py-0.5 rounded-full">提携校</span>
+          )}
+          {school.rating != null && (
+            <span className="absolute top-2 right-2 text-[11px] font-semibold bg-white/90 px-2 py-0.5 rounded-full text-amber-500">
+              ★ {Number(school.rating).toFixed(1)}
+            </span>
+          )}
+        </div>
+        <div className="p-3 pb-2">
+          <p className="text-xs font-bold text-primary leading-snug line-clamp-2">{school.name}</p>
+          <p className="text-[10px] text-muted mt-0.5">{school.city} · {school.type}</p>
+          {school.fee_per_week != null && (
+            <p className="text-sm font-bold text-primary mt-1">
+              ¥{school.fee_per_week.toLocaleString()}<span className="text-[10px] font-normal text-muted">/週</span>
+            </p>
+          )}
+        </div>
+      </button>
+      <div className="px-3 pb-3 flex gap-2">
+        <button
+          onClick={onTap}
+          className="flex-1 bg-primary/10 text-primary text-[11px] font-semibold py-1.5 rounded-xl text-center hover:bg-primary hover:text-white transition-all"
+        >
+          詳しく見る →
+        </button>
+        <button
+          onClick={onRemove}
+          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border border-border text-muted hover:border-red-300 hover:text-red-400 transition-all text-sm"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SpotCards({ spots }: { spots: CitySpot[] }) {
   if (spots.length === 0) return null;
   return (
@@ -156,6 +306,10 @@ export default function PlanDetailPage() {
   const [newItemLabel, setNewItemLabel] = useState('');
   const [newItemType, setNewItemType] = useState<'school' | 'city' | 'other'>('other');
 
+  // 学校データ + 詳細モーダル
+  const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
+  const [focusedSchool, setFocusedSchool] = useState<SchoolItem | null>(null);
+
   // エージェントモーダル
   const [showAgentModal, setShowAgentModal] = useState(false);
 
@@ -185,6 +339,12 @@ export default function PlanDetailPage() {
       setLoading(false);
     });
   }, [id]);
+
+  useEffect(() => {
+    fetch('/api/schools').then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setAllSchools(data);
+    }).catch(() => {/* ignore */});
+  }, []);
 
   useEffect(() => {
     if (titleEditing && titleInputRef.current) {
@@ -603,17 +763,37 @@ export default function PlanDetailPage() {
             {/* 保存済みカード */}
             <div>
               <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">保存済みカード</p>
-              {savedItems.length > 0 && (
-                <div className="flex flex-col gap-1.5 mb-2">
-                  {savedItems.map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 bg-white border border-border rounded-xl px-3 py-2">
-                      <span className="text-base flex-shrink-0">{ITEM_TYPE_ICONS[item.type]}</span>
-                      <span className="flex-1 text-sm text-primary leading-snug">{item.label}</span>
-                      <button onClick={() => removeSavedItem(i)} className="text-muted hover:text-red-400 transition-colors text-sm flex-shrink-0">✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {savedItems.length > 0 && (() => {
+                const schoolCards = savedItems
+                  .map((item, i) => ({ item, i, school: item.type === 'school' ? allSchools.find(s => s.name === item.label) ?? null : null }))
+                  .filter(x => x.school !== null);
+                const otherItems = savedItems
+                  .map((item, i) => ({ item, i }))
+                  .filter(({ item }) => item.type !== 'school' || !allSchools.find(s => s.name === item.label));
+                return (
+                  <div className="mb-2 flex flex-col gap-2">
+                    {schoolCards.length > 0 && (
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                        {schoolCards.map(({ school, i }) => (
+                          <SchoolSavedCard
+                            key={i}
+                            school={school!}
+                            onTap={() => setFocusedSchool(school)}
+                            onRemove={() => removeSavedItem(i)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {otherItems.map(({ item, i }) => (
+                      <div key={i} className="flex items-center gap-2 bg-white border border-border rounded-xl px-3 py-2">
+                        <span className="text-base flex-shrink-0">{ITEM_TYPE_ICONS[item.type]}</span>
+                        <span className="flex-1 text-sm text-primary leading-snug">{item.label}</span>
+                        <button onClick={() => removeSavedItem(i)} className="text-muted hover:text-red-400 transition-colors text-sm flex-shrink-0">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               <div className="flex gap-2">
                 <select
                   value={newItemType}
@@ -685,6 +865,11 @@ export default function PlanDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 学校詳細モーダル */}
+      {focusedSchool && (
+        <SchoolDetailModal school={focusedSchool} onClose={() => setFocusedSchool(null)} />
+      )}
 
       {/* エージェント相談モーダル */}
       <AgentContactModal
