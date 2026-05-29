@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット' },
   { href: '/plans',       icon: '/icon-plan.png',        label: 'プラン' },
   { href: '/explore',     icon: '/icon-explore.png',     label: '探す' },
+  { href: '/messages',    icon: '/icon-chat.png',        label: 'メッセージ' },
   { href: '/saved',       icon: '/icon-saved.png',       label: '保存済み' },
   { href: '/qa',          icon: '/icon-qa.png',          label: '先輩Q&A' },
   { href: '/inspiration', icon: '/icon-inspiration.png', label: 'インスピレーション' },
