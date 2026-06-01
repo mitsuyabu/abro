@@ -26,6 +26,25 @@ interface UserPlan {
   destination_country: string | null;
 }
 
+interface FlightSegment {
+  departure_airport: { id: string; name: string; time: string };
+  arrival_airport: { id: string; name: string; time: string };
+  duration: number;
+  airline: string;
+  airline_logo?: string;
+  flight_number: string;
+}
+
+interface FlightResult {
+  flights: FlightSegment[];
+  layovers?: { id: string; name: string; duration: number }[];
+  total_duration: number;
+  price: number;
+  airline_logo?: string;
+  booking_token?: string;
+  type?: string;
+}
+
 // ── 定数 ──────────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<string, { emoji: string; label: string }> = {
@@ -179,35 +198,137 @@ function AddBookingModal({
   );
 }
 
+function formatFlightTime(datetime: string): string {
+  const d = new Date(datetime);
+  return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h${m}m` : `${h}h`;
+}
+
+function FlightCard({ flight, origin, dest, date }: { flight: FlightResult; origin: string; dest: string; date: string }) {
+  const first = flight.flights[0];
+  const last = flight.flights[flight.flights.length - 1];
+  const stops = flight.flights.length - 1;
+  const logo = flight.airline_logo ?? first?.airline_logo;
+
+  // Google Flights の該当便ページへのリンク
+  const bookingUrl = flight.booking_token
+    ? `https://www.google.com/travel/flights?tfs=${encodeURIComponent(flight.booking_token)}`
+    : `https://www.google.com/travel/flights#flt=${origin}.${dest}.${date};c:JPY;e:1;sd:1;t:f`;
+
+  return (
+    <div className="border border-border rounded-2xl overflow-hidden bg-white hover:border-primary/40 hover:shadow-sm transition-all">
+      <div className="px-4 py-3 flex items-center gap-3">
+        {/* 航空会社ロゴ */}
+        <div className="flex-shrink-0 w-10 h-10 rounded-xl border border-border flex items-center justify-center overflow-hidden bg-white">
+          {logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logo} alt={first?.airline} className="w-8 h-8 object-contain" />
+          ) : (
+            <span className="text-xl">✈️</span>
+          )}
+        </div>
+
+        {/* 時刻・ルート */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-primary">{first ? formatFlightTime(first.departure_airport.time) : '--'}</span>
+            <div className="flex-1 flex flex-col items-center min-w-0">
+              <div className="flex items-center gap-1 w-full">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] text-muted flex-shrink-0">{formatDuration(flight.total_duration)}</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <span className={`text-[9px] font-semibold mt-0.5 ${stops === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {stops === 0 ? '直行' : `${stops}回乗継`}
+              </span>
+            </div>
+            <span className="text-base font-bold text-primary">{last ? formatFlightTime(last.arrival_airport.time) : '--'}</span>
+          </div>
+          <div className="flex items-center justify-between mt-0.5">
+            <span className="text-[10px] text-muted">{first?.departure_airport.id}</span>
+            <span className="text-[10px] text-muted truncate px-1">{first?.airline} {first?.flight_number}</span>
+            <span className="text-[10px] text-muted">{last?.arrival_airport.id}</span>
+          </div>
+        </div>
+
+        {/* 価格 */}
+        <div className="flex-shrink-0 text-right">
+          <p className="text-base font-bold text-primary">¥{flight.price.toLocaleString()}</p>
+          <p className="text-[9px] text-muted">片道・1名</p>
+        </div>
+      </div>
+
+      {/* 乗継情報 */}
+      {flight.layovers && flight.layovers.length > 0 && (
+        <div className="px-4 py-1.5 bg-amber-50 border-t border-amber-100">
+          <p className="text-[10px] text-amber-700">
+            乗継: {flight.layovers.map(l => `${l.name} (${formatDuration(l.duration)})`).join(' → ')}
+          </p>
+        </div>
+      )}
+
+      {/* 確認ボタン */}
+      <div className="px-4 pb-3 pt-0">
+        <a
+          href={bookingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full text-center bg-primary/10 text-primary text-xs font-semibold py-2 rounded-xl hover:bg-primary hover:text-white transition-all"
+        >
+          この便を Google Flights で確認 →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function FlightSearchCard({ destCity }: { destCity: string | null }) {
   const defaultDest = (destCity ? CITY_TO_IATA[destCity] : null) ?? 'SYD';
   const [origin, setOrigin] = useState('NRT');
   const [dest, setDest] = useState(defaultDest);
   const [date, setDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [flights, setFlights] = useState<FlightResult[]>([]);
+  const [notConfigured, setNotConfigured] = useState(false);
+  const [searched, setSearched] = useState(false);
 
-  const skyscannerUrl = () => {
-    const d = date.replace(/-/g, '').slice(2); // YYMMDD
-    return `https://www.skyscanner.net/transport/flights/${origin.toLowerCase()}/${dest.toLowerCase()}/${d}/`;
+  const handleSearch = async () => {
+    if (!date) return;
+    setLoading(true);
+    setSearched(true);
+    setFlights([]);
+    const res = await fetch('/api/flights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origin, destination: dest, departureDate: date }),
+    });
+    const data = await res.json() as { configured: boolean; flights?: FlightResult[] };
+    if (!data.configured) { setNotConfigured(true); setLoading(false); return; }
+    setFlights(data.flights ?? []);
+    setLoading(false);
   };
-
-  const googleFlightsUrl = () =>
-    `https://www.google.com/travel/flights#flt=${origin}.${dest}.${date};c:JPY;e:1;sd:1;t:f`;
-
-  const ready = !!date;
 
   return (
     <div className="bg-white border border-border rounded-2xl overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <span className="text-lg">✈️</span>
         <p className="text-xs font-semibold text-primary">フライト検索</p>
+        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full ml-auto">Google Flights</span>
       </div>
-      <div className="px-5 py-4 flex flex-col gap-3">
+
+      {/* 検索フォーム */}
+      <div className="px-5 pt-4 pb-3 flex flex-col gap-3">
         <div className="flex gap-2">
           <div className="flex-1">
             <p className="text-[10px] text-muted mb-1">出発地</p>
             <select value={origin} onChange={e => setOrigin(e.target.value)} className="w-full border border-border rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary bg-white">
-              <option value="NRT">東京 (NRT)</option>
-              <option value="HND">東京 (HND)</option>
+              <option value="NRT">東京 成田 (NRT)</option>
+              <option value="HND">東京 羽田 (HND)</option>
               <option value="KIX">大阪 (KIX)</option>
               <option value="NGO">名古屋 (NGO)</option>
               <option value="CTS">札幌 (CTS)</option>
@@ -223,38 +344,58 @@ function FlightSearchCard({ destCity }: { destCity: string | null }) {
             </select>
           </div>
         </div>
-        <div>
-          <p className="text-[10px] text-muted mb-1">出発日</p>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className="w-full border border-border rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary" />
-        </div>
-        <div className="flex gap-2">
-          <a
-            href={ready ? googleFlightsUrl() : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-disabled={!ready}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              ready ? 'bg-primary text-white hover:opacity-80' : 'bg-gray-100 text-gray-400 pointer-events-none'
-            }`}
+        <div className="flex gap-2 items-end">
+          <div className="flex-1">
+            <p className="text-[10px] text-muted mb-1">出発日</p>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              min={new Date().toISOString().slice(0, 10)}
+              className="w-full border border-border rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={!date || loading}
+            className="flex-shrink-0 bg-primary text-white text-sm font-semibold px-5 py-2 rounded-xl disabled:opacity-40 hover:opacity-80 transition-opacity"
           >
-            <span>🔍</span><span>Google Flights</span>
-          </a>
-          <a
-            href={ready ? skyscannerUrl() : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-disabled={!ready}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-              ready ? 'border-primary text-primary hover:bg-primary/5' : 'border-border text-gray-400 pointer-events-none'
-            }`}
-          >
-            <span>✈️</span><span>Skyscanner</span>
-          </a>
+            {loading ? '検索中...' : '検索'}
+          </button>
         </div>
-        {!ready && (
-          <p className="text-[10px] text-muted text-center">出発日を選ぶと検索ボタンが有効になります</p>
-        )}
       </div>
+
+      {/* 結果エリア */}
+      {notConfigured && (
+        <div className="mx-5 mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+          <p className="font-semibold mb-1">SerpAPI キーが未設定です</p>
+          <p><a href="https://serpapi.com/users/sign_up" target="_blank" rel="noopener noreferrer" className="underline">serpapi.com</a> で無料登録後、<code className="bg-amber-100 px-1 rounded">SERPAPI_KEY</code> を .env.local に追加してください。</p>
+          <p className="mt-1 text-amber-600">無料プラン：100回/月</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="px-5 pb-5 flex flex-col gap-2">
+          {[1,2,3].map(i => (
+            <div key={i} className="h-24 bg-gray-100 rounded-2xl animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {searched && !loading && !notConfigured && flights.length === 0 && (
+        <p className="px-5 pb-5 text-xs text-muted text-center py-4">
+          該当するフライトが見つかりませんでした。<br />日付や目的地を変えてお試しください。
+        </p>
+      )}
+
+      {flights.length > 0 && (
+        <div className="px-5 pb-5 flex flex-col gap-2">
+          <p className="text-[10px] text-muted mb-1">{flights.length}件の候補が見つかりました</p>
+          {flights.map((flight, i) => (
+            <FlightCard key={i} flight={flight} origin={origin} dest={dest} date={date} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
