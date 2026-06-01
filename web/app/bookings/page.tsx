@@ -26,21 +26,6 @@ interface UserPlan {
   destination_country: string | null;
 }
 
-interface FlightOffer {
-  id: string;
-  price: { grandTotal: string; currency: string };
-  itineraries: {
-    duration: string;
-    segments: {
-      departure: { iataCode: string; at: string };
-      arrival: { iataCode: string; at: string };
-      carrierCode: string;
-      number: string;
-      numberOfStops: number;
-    }[];
-  }[];
-}
-
 // ── 定数 ──────────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<string, { emoji: string; label: string }> = {
@@ -83,18 +68,6 @@ const COUNTRY_TO_WN: Record<string, string> = {
   ニュージーランド: 'NZ', フィリピン: 'PH', マルタ: 'MT',
   アメリカ: 'US', アイルランド: 'IE',
 };
-
-function parseDuration(iso: string): string {
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-  if (!m) return iso;
-  const h = m[1] ?? '0';
-  const min = m[2] ? `${m[2]}m` : '';
-  return `${h}h${min}`;
-}
-
-function formatTime(isoDateTime: string): string {
-  return new Date(isoDateTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-}
 
 // ── サブコンポーネント ────────────────────────────────────────────────────
 
@@ -206,45 +179,27 @@ function AddBookingModal({
   );
 }
 
-function FlightSearchCard({ destCity, destCountry }: { destCity: string | null; destCountry: string | null }) {
+function FlightSearchCard({ destCity }: { destCity: string | null }) {
   const defaultDest = (destCity ? CITY_TO_IATA[destCity] : null) ?? 'SYD';
   const [origin, setOrigin] = useState('NRT');
   const [dest, setDest] = useState(defaultDest);
   const [date, setDate] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [offers, setOffers] = useState<FlightOffer[]>([]);
-  const [notConfigured, setNotConfigured] = useState(false);
-  const [searched, setSearched] = useState(false);
 
-  const handleSearch = async () => {
-    if (!date) return;
-    setLoading(true);
-    setSearched(true);
-    const res = await fetch('/api/flights', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ origin, destination: dest, departureDate: date }),
-    });
-    const data = await res.json() as { configured: boolean; offers?: FlightOffer[] };
-    if (!data.configured) { setNotConfigured(true); setLoading(false); return; }
-    setOffers(data.offers ?? []);
-    setLoading(false);
-  };
-
-  // Skyscanner深リンク
-  const skyscannerUrl = (offer: FlightOffer) => {
-    const seg = offer.itineraries[0]?.segments[0];
-    if (!seg) return `https://www.skyscanner.net/`;
-    const d = seg.departure.at.slice(0, 10).replace(/-/g, '').slice(2);
+  const skyscannerUrl = () => {
+    const d = date.replace(/-/g, '').slice(2); // YYMMDD
     return `https://www.skyscanner.net/transport/flights/${origin.toLowerCase()}/${dest.toLowerCase()}/${d}/`;
   };
+
+  const googleFlightsUrl = () =>
+    `https://www.google.com/travel/flights#flt=${origin}.${dest}.${date};c:JPY;e:1;sd:1;t:f`;
+
+  const ready = !!date;
 
   return (
     <div className="bg-white border border-border rounded-2xl overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex items-center gap-2">
         <span className="text-lg">✈️</span>
         <p className="text-xs font-semibold text-primary">フライト検索</p>
-        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full ml-auto">Amadeus API</span>
       </div>
       <div className="px-5 py-4 flex flex-col gap-3">
         <div className="flex gap-2">
@@ -268,69 +223,36 @@ function FlightSearchCard({ destCity, destCountry }: { destCity: string | null; 
             </select>
           </div>
         </div>
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <p className="text-[10px] text-muted mb-1">出発日</p>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className="w-full border border-border rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary" />
-          </div>
-          <button
-            onClick={handleSearch}
-            disabled={!date || loading}
-            className="flex-shrink-0 bg-primary text-white text-sm font-semibold px-5 py-2 rounded-xl disabled:opacity-40 hover:opacity-80 transition-opacity"
-          >
-            {loading ? '検索中...' : '検索'}
-          </button>
+        <div>
+          <p className="text-[10px] text-muted mb-1">出発日</p>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} min={new Date().toISOString().slice(0, 10)} className="w-full border border-border rounded-xl px-3 py-2 text-sm text-primary focus:outline-none focus:border-primary" />
         </div>
-
-        {notConfigured && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
-            <p className="font-semibold mb-1">Amadeus APIキーが未設定です</p>
-            <p>developers.amadeus.com で無料登録後、<code className="bg-amber-100 px-1 rounded">AMADEUS_CLIENT_ID</code> と <code className="bg-amber-100 px-1 rounded">AMADEUS_CLIENT_SECRET</code> を .env.local に追加してください。</p>
-          </div>
-        )}
-
-        {searched && !loading && !notConfigured && offers.length === 0 && (
-          <p className="text-xs text-muted text-center py-3">該当するフライトが見つかりませんでした</p>
-        )}
-
-        {offers.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {offers.map(offer => {
-              const seg = offer.itineraries[0]?.segments[0];
-              const lastSeg = offer.itineraries[0]?.segments.at(-1);
-              const stops = (offer.itineraries[0]?.segments.length ?? 1) - 1;
-              const dur = parseDuration(offer.itineraries[0]?.duration ?? '');
-              const price = parseInt(offer.price.grandTotal).toLocaleString();
-              return (
-                <a
-                  key={offer.id}
-                  href={skyscannerUrl(offer)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 border border-border rounded-xl px-4 py-3 hover:border-primary/40 hover:bg-primary/5 transition-all"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-primary">
-                      <span>{seg?.departure.iataCode}</span>
-                      <span className="text-muted">→</span>
-                      <span>{lastSeg?.arrival.iataCode}</span>
-                      <span className="font-normal text-muted">({dur})</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted">
-                      <span>{seg ? formatTime(seg.departure.at) : ''} → {lastSeg ? formatTime(lastSeg.arrival.at) : ''}</span>
-                      <span>·</span>
-                      <span>{seg?.carrierCode}{seg?.number}</span>
-                      {stops > 0 && <span className="text-amber-600">{stops}回乗継</span>}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-primary">¥{price}</p>
-                    <p className="text-[10px] text-primary/60">Skyscanner →</p>
-                  </div>
-                </a>
-              );
-            })}
-          </div>
+        <div className="flex gap-2">
+          <a
+            href={ready ? googleFlightsUrl() : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={!ready}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              ready ? 'bg-primary text-white hover:opacity-80' : 'bg-gray-100 text-gray-400 pointer-events-none'
+            }`}
+          >
+            <span>🔍</span><span>Google Flights</span>
+          </a>
+          <a
+            href={ready ? skyscannerUrl() : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled={!ready}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+              ready ? 'border-primary text-primary hover:bg-primary/5' : 'border-border text-gray-400 pointer-events-none'
+            }`}
+          >
+            <span>✈️</span><span>Skyscanner</span>
+          </a>
+        </div>
+        {!ready && (
+          <p className="text-[10px] text-muted text-center">出発日を選ぶと検索ボタンが有効になります</p>
         )}
       </div>
     </div>
@@ -493,10 +415,7 @@ export default function BookingsPage() {
         <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-5">
           {/* フライト検索（航空券タブ or すべてタブのみ表示） */}
           {(activeTab === 'all' || activeTab === 'flight') && (
-            <FlightSearchCard
-              destCity={latestPlan?.destination_city ?? null}
-              destCountry={latestPlan?.destination_country ?? null}
-            />
+            <FlightSearchCard destCity={latestPlan?.destination_city ?? null} />
           )}
 
           {/* 提携パートナー */}
