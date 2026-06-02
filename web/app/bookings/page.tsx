@@ -90,20 +90,32 @@ const COUNTRY_TO_WN: Record<string, string> = {
 
 // ── サブコンポーネント ────────────────────────────────────────────────────
 
+interface ParsedBooking {
+  type: string;
+  title: string;
+  provider: string;
+  amount: number | null;
+  currency: string;
+  date: string | null;
+  notes: string | null;
+}
+
 function AddBookingModal({
   onClose,
   onAdded,
+  prefill,
 }: {
   onClose: () => void;
   onAdded: () => void;
+  prefill?: ParsedBooking;
 }) {
-  const [type, setType] = useState<string>('flight');
-  const [title, setTitle] = useState('');
-  const [provider, setProvider] = useState('');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('JPY');
-  const [date, setDate] = useState('');
-  const [notes, setNotes] = useState('');
+  const [type, setType] = useState<string>(prefill?.type ?? 'flight');
+  const [title, setTitle] = useState(prefill?.title ?? '');
+  const [provider, setProvider] = useState(prefill?.provider ?? '');
+  const [amount, setAmount] = useState(prefill?.amount != null ? String(prefill.amount) : '');
+  const [currency, setCurrency] = useState(prefill?.currency ?? 'JPY');
+  const [date, setDate] = useState(prefill?.date ?? '');
+  const [notes, setNotes] = useState(prefill?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -132,8 +144,13 @@ function AddBookingModal({
       <div className="absolute inset-0 bg-black/50" />
       <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
-        <div className="px-5 py-3 border-b border-border flex-shrink-0">
+        <div className="px-5 py-3 border-b border-border flex-shrink-0 flex items-center gap-2">
           <h2 className="text-base font-bold text-primary">予約を追加</h2>
+          {prefill && (
+            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold flex-shrink-0">
+              ✓ 書類から自動入力
+            </span>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
           {/* タイプ */}
@@ -480,6 +497,8 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [parsedBooking, setParsedBooking] = useState<ParsedBooking | null>(null);
+  const [parsing, setParsing] = useState(false);
   const [latestPlan, setLatestPlan] = useState<UserPlan | null>(null);
 
   const fetchBookings = async () => {
@@ -519,6 +538,26 @@ export default function BookingsPage() {
     })).filter(x => x.total > 0);
     return { total, byType };
   }, [bookings]);
+
+  const handleFileUpload = async (file: File) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
+    if (!allowed.includes(file.type) && !file.name.match(/\.(jpg|jpeg|png|webp|heic|heif|pdf)$/i)) {
+      alert('JPEG・PNG・WebP・HEIC・PDF ファイルに対応しています');
+      return;
+    }
+    setParsing(true);
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch('/api/bookings/parse-document', { method: 'POST', body: form });
+    const json = await res.json() as { ok?: boolean; data?: ParsedBooking; error?: string };
+    setParsing(false);
+    if (json.ok && json.data) {
+      setParsedBooking(json.data);
+      setShowAdd(true);
+    } else {
+      alert(json.error ?? '解析に失敗しました。別のファイルを試してください。');
+    }
+  };
 
   const handleDelete = async (id: string) => {
     const supabase = createClient();
@@ -571,12 +610,26 @@ export default function BookingsPage() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-muted uppercase tracking-wide">あなたの予約</p>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="flex items-center gap-1.5 bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity"
-              >
-                <span>＋</span><span>追加</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* アップロードボタン */}
+                <label className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border border-primary text-primary hover:bg-primary/5 transition-all cursor-pointer ${parsing ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <span>{parsing ? '⏳' : '📄'}</span>
+                  <span>{parsing ? '解析中...' : '書類を読み取る'}</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf,.heic,.heif"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
+                    disabled={parsing}
+                  />
+                </label>
+                <button
+                  onClick={() => { setParsedBooking(null); setShowAdd(true); }}
+                  className="flex items-center gap-1.5 bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-full hover:opacity-80 transition-opacity"
+                >
+                  <span>＋</span><span>手動追加</span>
+                </button>
+              </div>
             </div>
 
             {loading ? (
@@ -700,8 +753,9 @@ export default function BookingsPage() {
       {/* モーダル */}
       {showAdd && (
         <AddBookingModal
-          onClose={() => setShowAdd(false)}
-          onAdded={() => { setShowAdd(false); fetchBookings(); }}
+          onClose={() => { setShowAdd(false); setParsedBooking(null); }}
+          onAdded={() => { setShowAdd(false); setParsedBooking(null); fetchBookings(); }}
+          prefill={parsedBooking ?? undefined}
         />
       )}
     </div>
