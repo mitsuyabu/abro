@@ -23,12 +23,21 @@ interface FirstWeekDay {
   day: string;
   highlight: string;
   tips: string;
+  eats?: string[];
+}
+
+interface YearlyTrip {
+  area: string;
+  stay?: string;
+  spots?: string;
+  shops?: string;
 }
 
 interface YearlyMonth {
   month: string;
   title: string;
   detail: string;
+  trip?: YearlyTrip;
 }
 
 interface PlanDetails {
@@ -595,6 +604,16 @@ export default function PlanDetailPage() {
                           <span className="text-amber-500 text-xs flex-shrink-0 mt-0.5">💡</span>
                           <p className="text-xs text-amber-800 leading-relaxed">{item.tips}</p>
                         </div>
+                        {item.eats && item.eats.length > 0 && (
+                          <div className="mt-2 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5">
+                            <p className="text-[10px] font-semibold text-orange-600 mb-1.5">🍽 食事のおすすめ</p>
+                            <div className="flex flex-col gap-1">
+                              {item.eats.map((eat, ei) => (
+                                <p key={ei} className="text-xs text-orange-800 leading-relaxed">{eat}</p>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <SpotCards spots={daySpots} />
                       </div>
                     </div>
@@ -625,6 +644,16 @@ export default function PlanDetailPage() {
                         <span className="text-[10px] font-semibold text-muted uppercase tracking-wide">{item.month}</span>
                         <p className="text-sm font-bold text-primary mt-0.5 leading-snug">{item.title}</p>
                         <p className="text-xs text-muted leading-relaxed mt-1">{item.detail}</p>
+                        {item.trip && (
+                          <div className="mt-2 bg-sky-50 border border-sky-100 rounded-xl px-3 py-2.5">
+                            <p className="text-[10px] font-semibold text-sky-600 mb-1.5">✈️ 旅行提案：{item.trip.area}</p>
+                            <div className="flex flex-col gap-1">
+                              {item.trip.stay && <p className="text-xs text-sky-800 leading-relaxed">🏨 {item.trip.stay}</p>}
+                              {item.trip.spots && <p className="text-xs text-sky-800 leading-relaxed">📍 {item.trip.spots}</p>}
+                              {item.trip.shops && <p className="text-xs text-sky-800 leading-relaxed">🛍 {item.trip.shops}</p>}
+                            </div>
+                          </div>
+                        )}
                         <SpotCards spots={monthSpots} />
                       </div>
                     </div>
