@@ -123,41 +123,41 @@ function getSessionTitle(messages: Message[]): string {
   return t.length > 28 ? t.slice(0, 28) + '…' : t;
 }
 
-function lsGetSessions(): SessionSummary[] {
+function lsGetSessions(uid: string): SessionSummary[] {
   try {
-    const raw = localStorage.getItem('abro-chat-sessions');
+    const raw = localStorage.getItem(`abro-chat-sessions-${uid}`);
     return raw ? (JSON.parse(raw) as SessionSummary[]) : [];
   } catch { return []; }
 }
 
-function lsSaveSessions(sessions: SessionSummary[]): void {
-  try { localStorage.setItem('abro-chat-sessions', JSON.stringify(sessions)); } catch { /* ignore */ }
+function lsSaveSessions(uid: string, sessions: SessionSummary[]): void {
+  try { localStorage.setItem(`abro-chat-sessions-${uid}`, JSON.stringify(sessions)); } catch { /* ignore */ }
 }
 
-function lsSaveSession(id: string, messages: Message[], conversationState: ConversationState): void {
+function lsSaveSession(uid: string, id: string, messages: Message[], conversationState: ConversationState): void {
   try {
     const stored: StoredSession = { messages, conversationState };
-    localStorage.setItem(`abro-chat-session-${id}`, JSON.stringify(stored));
-    const sessions = lsGetSessions();
+    localStorage.setItem(`abro-chat-session-${uid}-${id}`, JSON.stringify(stored));
+    const sessions = lsGetSessions(uid);
     const title = getSessionTitle(messages);
     const idx = sessions.findIndex(s => s.id === id);
     const summary: SessionSummary = { id, title, updatedAt: Date.now(), messageCount: messages.length };
     if (idx >= 0) sessions[idx] = summary; else sessions.unshift(summary);
-    lsSaveSessions(sessions);
+    lsSaveSessions(uid, sessions);
   } catch { /* ignore */ }
 }
 
-function lsLoadSession(id: string): StoredSession | null {
+function lsLoadSession(uid: string, id: string): StoredSession | null {
   try {
-    const raw = localStorage.getItem(`abro-chat-session-${id}`);
+    const raw = localStorage.getItem(`abro-chat-session-${uid}-${id}`);
     return raw ? (JSON.parse(raw) as StoredSession) : null;
   } catch { return null; }
 }
 
-function lsDeleteSession(id: string): void {
+function lsDeleteSession(uid: string, id: string): void {
   try {
-    localStorage.removeItem(`abro-chat-session-${id}`);
-    lsSaveSessions(lsGetSessions().filter(s => s.id !== id));
+    localStorage.removeItem(`abro-chat-session-${uid}-${id}`);
+    lsSaveSessions(uid, lsGetSessions(uid).filter(s => s.id !== id));
   } catch { /* ignore */ }
 }
 
@@ -748,6 +748,7 @@ export default function ChatPage() {
 
   // セッション管理
   const sessionIdRef = useRef<string>(generateId());
+  const userIdRef = useRef<string>('guest');
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -755,54 +756,59 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const msgCountRef = useRef(0);
 
-  // 起動時：セッション読み込み（旧フォーマットからの移行も対応）
+  // 起動時：ユーザー認証 → そのユーザーのセッションを読み込む
   useEffect(() => {
-    try {
-      const savedSessions = lsGetSessions();
-
-      if (savedSessions.length === 0) {
-        // 旧フォーマット（abro-chat-messages）から移行
-        const savedMsgs = localStorage.getItem('abro-chat-messages');
-        const savedState = localStorage.getItem('abro-conversation-state');
-        if (savedMsgs) {
-          const parsed = JSON.parse(savedMsgs) as Message[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const state: ConversationState = savedState ? JSON.parse(savedState) : getInitialState();
-            lsSaveSession(sessionIdRef.current, parsed, state);
-            setMessages(parsed);
-            setConversationState(state);
-            msgCountRef.current = parsed.length;
-            localStorage.removeItem('abro-chat-messages');
-            localStorage.removeItem('abro-conversation-state');
-            setSessions(lsGetSessions());
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id ?? 'guest';
+      userIdRef.current = uid;
+      try {
+        const savedSessions = lsGetSessions(uid);
+        if (savedSessions.length === 0) {
+          // 旧フォーマット（abro-chat-messages）から移行
+          const savedMsgs = localStorage.getItem('abro-chat-messages');
+          const savedState = localStorage.getItem('abro-conversation-state');
+          if (savedMsgs) {
+            const parsed = JSON.parse(savedMsgs) as Message[];
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const state: ConversationState = savedState ? JSON.parse(savedState) : getInitialState();
+              lsSaveSession(uid, sessionIdRef.current, parsed, state);
+              setMessages(parsed);
+              setConversationState(state);
+              msgCountRef.current = parsed.length;
+              localStorage.removeItem('abro-chat-messages');
+              localStorage.removeItem('abro-conversation-state');
+              setSessions(lsGetSessions(uid));
+            }
           }
+        } else {
+          // 最新セッションを読み込む
+          const latest = savedSessions[0];
+          sessionIdRef.current = latest.id;
+          const data2 = lsLoadSession(uid, latest.id);
+          if (data2) {
+            setMessages(data2.messages);
+            setConversationState(data2.conversationState);
+            msgCountRef.current = data2.messages.length;
+          }
+          setSessions(savedSessions);
         }
-      } else {
-        // 最新セッションを読み込む
-        const latest = savedSessions[0];
-        sessionIdRef.current = latest.id;
-        const data = lsLoadSession(latest.id);
-        if (data) {
-          setMessages(data.messages);
-          setConversationState(data.conversationState);
-          msgCountRef.current = data.messages.length;
-        }
-        setSessions(savedSessions);
-      }
-    } catch { /* ignore */ }
-    setChatLoaded(true);
+      } catch { /* ignore */ }
+      setChatLoaded(true);
+    });
   }, []);
 
   // メッセージ・会話状態が変わったら自動保存
   useEffect(() => {
     if (!chatLoaded) return;
     if (messages.length === 0) return;
-    lsSaveSession(sessionIdRef.current, messages, conversationState);
+    lsSaveSession(userIdRef.current, sessionIdRef.current, messages, conversationState);
   }, [messages, conversationState, chatLoaded]);
 
   const handleNewChat = () => {
+    const uid = userIdRef.current;
     if (messages.length > 0) {
-      lsSaveSession(sessionIdRef.current, messages, conversationState);
+      lsSaveSession(uid, sessionIdRef.current, messages, conversationState);
     }
     sessionIdRef.current = generateId();
     setMessages([]);
@@ -812,20 +818,21 @@ export default function ChatPage() {
     setPlanError(null);
     msgCountRef.current = 0;
     setShowSessionDropdown(false);
-    setSessions(lsGetSessions());
+    setSessions(lsGetSessions(uid));
     setSchoolChipsHidden(false);
     setSchoolPreferences(new Set());
   };
 
   const handleLoadSession = (id: string) => {
+    const uid = userIdRef.current;
     if (id === sessionIdRef.current) {
       setShowSessionDropdown(false);
       return;
     }
     if (messages.length > 0) {
-      lsSaveSession(sessionIdRef.current, messages, conversationState);
+      lsSaveSession(uid, sessionIdRef.current, messages, conversationState);
     }
-    const data = lsLoadSession(id);
+    const data = lsLoadSession(uid, id);
     if (!data) return;
     sessionIdRef.current = id;
     setMessages(data.messages);
@@ -834,13 +841,14 @@ export default function ChatPage() {
     setPlanError(null);
     msgCountRef.current = data.messages.length;
     setShowSessionDropdown(false);
-    setSessions(lsGetSessions());
+    setSessions(lsGetSessions(uid));
   };
 
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+    const uid = userIdRef.current;
     e.stopPropagation();
-    lsDeleteSession(id);
-    const updated = lsGetSessions();
+    lsDeleteSession(uid, id);
+    const updated = lsGetSessions(uid);
     setSessions(updated);
     // 現在のセッションを削除した場合は新規作成
     if (id === sessionIdRef.current) {
@@ -855,7 +863,7 @@ export default function ChatPage() {
 
   const handleToggleDropdown = () => {
     if (!showSessionDropdown) {
-      setSessions(lsGetSessions()); // 開く前に最新を取得
+      setSessions(lsGetSessions(userIdRef.current)); // 開く前に最新を取得
     }
     setShowSessionDropdown(v => !v);
   };
