@@ -43,14 +43,18 @@ export default function PlansPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    supabase
-      .from('plans')
-      .select('id, title, destination_country, destination_city, duration_weeks, budget_jpy, budget_max_jpy, purpose, status, details, created_at')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setPlans((data as Plan[]) ?? []);
-        setLoading(false);
-      });
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) { setLoading(false); return; }
+      supabase
+        .from('plans')
+        .select('id, title, destination_country, destination_city, duration_weeks, budget_jpy, budget_max_jpy, purpose, status, details, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => {
+          setPlans((data as Plan[]) ?? []);
+          setLoading(false);
+        });
+    });
   }, []);
 
   return (
