@@ -78,6 +78,7 @@ export default function InspirationPage() {
     supabase
       .from('plans')
       .select('id, title, destination_country, destination_city, budget_jpy, budget_max_jpy, purpose, details, created_at')
+      .eq('status', 'public')
       .order('created_at', { ascending: false })
       .then(({ data }) => setPlans((data as Plan[]) ?? []));
   }, []);

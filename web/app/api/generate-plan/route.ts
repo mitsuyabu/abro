@@ -165,7 +165,7 @@ export async function POST(req: Request) {
           yearly_plan: plan.yearly_plan ?? [],
           city_spots: citySpots,
         },
-        status: "draft",
+        status: "public",
       })
       .select("id")
       .single();
