@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AgentContactModal } from '@/components/AgentContactModal';
 import type { SchoolItem } from '@/components/chat/DynamicSidebar';
+import type { User } from '@supabase/supabase-js';
 
 type TaskStatus = 'none' | 'doing' | 'done';
 
@@ -64,6 +65,7 @@ interface PlanDetails {
 
 interface Plan {
   id: string;
+  user_id: string;
   title: string;
   destination_country: string | null;
   destination_city: string | null;
@@ -428,6 +430,7 @@ export default function PlanDetailPage() {
   const id = params?.id as string;
   const supabase = createClient();
 
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
@@ -475,6 +478,7 @@ export default function PlanDetailPage() {
 
   useEffect(() => {
     if (!id) return;
+    supabase.auth.getUser().then(({ data }) => setCurrentUser(data.user));
     supabase.from('plans').select('*').eq('id', id).single().then(({ data }) => {
       const p = data as Plan;
       setPlan(p);
@@ -608,6 +612,7 @@ export default function PlanDetailPage() {
     );
   }
 
+  const isOwner = !!currentUser && currentUser.id === plan.user_id;
   const cover = (plan.destination_city && CITY_COVER[plan.destination_city]) || FALLBACK_COVER;
   const duration = plan.details?.duration_label ?? (plan.duration_weeks ? `${plan.duration_weeks}週間` : null);
   const budgetMin = plan.budget_jpy ? Math.round(plan.budget_jpy / 10000) : null;
@@ -682,11 +687,13 @@ export default function PlanDetailPage() {
             ) : (
               <>
                 <h1 className="flex-1 text-2xl sm:text-3xl font-bold text-primary leading-snug">{plan.title}</h1>
-                <button
-                  onClick={() => { setEditedTitle(plan.title); setTitleEditing(true); }}
-                  className="flex-shrink-0 mt-1 text-muted hover:text-primary transition-colors text-sm"
-                  title="タイトルを編集"
-                >✏️</button>
+                {isOwner && (
+                  <button
+                    onClick={() => { setEditedTitle(plan.title); setTitleEditing(true); }}
+                    className="flex-shrink-0 mt-1 text-muted hover:text-primary transition-colors text-sm"
+                    title="タイトルを編集"
+                  >✏️</button>
+                )}
               </>
             )}
           </div>
@@ -886,8 +893,22 @@ export default function PlanDetailPage() {
             </div>
           )}
 
-          {/* ━━ カスタマイズ ━━ */}
-          <div className="mb-8">
+          {/* ━━ 非オーナー向け：参考にして作成ボタン ━━ */}
+          {!isOwner && (
+            <div className="mb-8 bg-primary/5 border border-primary/20 rounded-2xl p-5 text-center">
+              <p className="text-sm font-semibold text-primary mb-1">このプランが気に入りましたか？</p>
+              <p className="text-xs text-muted mb-4">このプランを参考に、あなただけのプランをAIと一緒に作れます</p>
+              <Link
+                href={`/chat?ref=${plan.id}`}
+                className="inline-flex items-center gap-2 bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:opacity-80 transition-opacity"
+              >
+                <span>✨</span><span>このプランを参考に作成する</span>
+              </Link>
+            </div>
+          )}
+
+          {/* ━━ カスタマイズ（オーナーのみ）━━ */}
+          {isOwner && <div className="mb-8">
             <h2 className="text-base font-bold text-primary mb-4">メモ・カスタマイズ</h2>
 
             {/* 再提案フォーム */}
@@ -1060,6 +1081,7 @@ export default function PlanDetailPage() {
               </div>
             </div>
           </div>
+          }  {/* isOwner end */}
         </div>
 
         {/* 右：渡航前準備 + 都市画像 */}

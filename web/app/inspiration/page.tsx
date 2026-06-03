@@ -29,6 +29,10 @@ interface Plan {
   purpose: string | null;
   details: { duration_label?: string } | null;
   created_at: string;
+  user_id: string;
+  author_nickname?: string | null;
+  author_avatar?: string | null;
+  author_phase?: string | null;
 }
 
 const GUIDES: Guide[] = [
@@ -77,10 +81,21 @@ export default function InspirationPage() {
   useEffect(() => {
     supabase
       .from('plans')
-      .select('id, title, destination_country, destination_city, budget_jpy, budget_max_jpy, purpose, details, created_at')
+      .select('id, title, destination_country, destination_city, budget_jpy, budget_max_jpy, purpose, details, created_at, user_id')
       .eq('status', 'public')
       .order('created_at', { ascending: false })
-      .then(({ data }) => setPlans((data as Plan[]) ?? []));
+      .then(async ({ data }) => {
+        if (!data) { setPlans([]); return; }
+        const userIds = [...new Set(data.map(p => p.user_id))];
+        const { data: usersData } = await supabase.from('users').select('id, nickname, avatar_url, phase').in('id', userIds);
+        const userMap = new Map((usersData ?? []).map(u => [u.id, u]));
+        setPlans((data as Plan[]).map(p => ({
+          ...p,
+          author_nickname: userMap.get(p.user_id)?.nickname ?? null,
+          author_avatar: userMap.get(p.user_id)?.avatar_url ?? null,
+          author_phase: userMap.get(p.user_id)?.phase ?? null,
+        })));
+      });
   }, []);
 
   const filteredGuides = GUIDES.filter(g => {
@@ -235,6 +250,21 @@ function PlanCard({ plan }: { plan: Plan }) {
         {budgetMin && (
           <span className="text-xs text-muted">
             💰 {budgetMin}{budgetMax && budgetMax !== budgetMin ? `〜${budgetMax}` : ''}万円
+          </span>
+        )}
+      </div>
+      {/* 作成者情報 */}
+      <div className="flex items-center gap-1.5 mt-2">
+        <div className="w-5 h-5 rounded-full flex-shrink-0 overflow-hidden bg-primary/10 flex items-center justify-center">
+          {plan.author_avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={plan.author_avatar} alt="" className="w-full h-full object-cover" />
+          ) : <span className="text-[9px]">👤</span>}
+        </div>
+        <span className="text-[11px] text-muted">{plan.author_nickname ?? '匿名ユーザー'}</span>
+        {plan.author_phase && (
+          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${PHASE_STYLE[plan.author_phase as Guide['authorPhase']] ?? 'bg-gray-100 text-gray-600'}`}>
+            {plan.author_phase === 'considering' ? '検討中' : plan.author_phase === 'preparing' ? '準備中' : plan.author_phase === 'abroad' ? '渡航中' : '帰国済'}
           </span>
         )}
       </div>
