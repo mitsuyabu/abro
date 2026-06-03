@@ -584,21 +584,47 @@ function GuideEditor({
   onPublish: (config: GuideConfig) => void;
   onSaveDraft: (config: GuideConfig) => void;
 }) {
-  const coverImage = getCoverImage(config.location);
   const [activeTab, setActiveTab] = useState<'overview' | 'map'>('overview');
   const [overview, setOverview] = useState(config.aiDraft?.overview ?? '');
   const [sections, setSections] = useState<GuideSection[]>(config.aiDraft?.sections ?? []);
   const [items, setItems] = useState<GuideItem[]>(config.aiDraft?.items ?? []);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // カバー画像
+  const [coverImage, setCoverImage] = useState(getCoverImage(config.location));
+  const [photoOptions, setPhotoOptions] = useState<{ id: number; url: string; photographer: string }[]>([]);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [showPhotoSelector, setShowPhotoSelector] = useState(false);
+
+  const fetchPhotos = async () => {
+    setPhotoLoading(true);
+    setShowPhotoSelector(true);
+    const params = new URLSearchParams({
+      title: config.title,
+      location: config.location,
+      category: config.category ?? '',
+    });
+    const res = await fetch(`/api/guides/cover-images?${params}`);
+    const data = await res.json() as { configured: boolean; photos?: { id: number; url: string; photographer: string }[] };
+    if (data.configured && data.photos) {
+      setPhotoOptions(data.photos);
+      if (data.photos.length > 0) setCoverImage(data.photos[0].url);
+    }
+    setPhotoLoading(false);
+  };
+
   const handleRegenerate = async () => {
     setAiLoading(true);
-    const res = await fetch('/api/guides/ai-assist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: config.category, location: config.location, title: config.title }),
-    });
-    const data = await res.json() as AiDraft & { error?: string };
+    // コンテンツ生成と画像取得を並行して実行
+    const [contentRes] = await Promise.all([
+      fetch('/api/guides/ai-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: config.category, location: config.location, title: config.title }),
+      }),
+      fetchPhotos(),
+    ]);
+    const data = await contentRes.json() as AiDraft & { error?: string };
     if (!data.error) {
       setOverview(data.overview ?? '');
       setSections(data.sections ?? []);
@@ -646,15 +672,66 @@ function GuideEditor({
 
       <div className="flex-1 overflow-y-auto">
         {/* カバー写真 */}
-        <div className="relative h-52 sm:h-72 flex-shrink-0">
+        <div className="relative h-52 sm:h-72 flex-shrink-0 group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={coverImage} alt="" className="w-full h-full object-cover" />
+          <img src={coverImage} alt="" className="w-full h-full object-cover transition-opacity duration-300" />
           <div className="absolute inset-0 bg-black/45" />
           <div className="absolute bottom-0 inset-x-0 p-6 sm:p-8 text-white text-center">
             <h1 className="text-2xl sm:text-3xl font-bold mb-2 drop-shadow">{config.title || '無題のガイド'}</h1>
             {config.location && <p className="text-sm opacity-80">📍 {config.location}</p>}
           </div>
+          {/* 写真変更ボタン */}
+          <button
+            onClick={fetchPhotos}
+            disabled={photoLoading}
+            className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-white transition-colors shadow"
+          >
+            {photoLoading ? '⏳ 検索中...' : '📷 写真を変更'}
+          </button>
         </div>
+
+        {/* 写真セレクター */}
+        {showPhotoSelector && (
+          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex-shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-muted">
+                {photoLoading ? '🔍 タイトル・場所から画像を検索中...' : `📸 候補の写真（${photoOptions.length}件）`}
+              </p>
+              <button onClick={() => setShowPhotoSelector(false)} className="text-xs text-muted hover:text-primary">閉じる</button>
+            </div>
+            {photoLoading ? (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[1,2,3,4].map(i => <div key={i} className="flex-shrink-0 w-32 h-20 bg-gray-200 rounded-xl animate-pulse" />)}
+              </div>
+            ) : photoOptions.length === 0 ? (
+              <div className="text-center py-3">
+                <p className="text-xs text-muted">Pexels API キーが未設定です</p>
+                <p className="text-[10px] text-muted mt-0.5">pexels.com/api で無料登録後、PEXELS_API_KEY を設定してください</p>
+              </div>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {photoOptions.map(photo => (
+                  <button
+                    key={photo.id}
+                    onClick={() => { setCoverImage(photo.url); setShowPhotoSelector(false); }}
+                    className={`flex-shrink-0 relative w-32 h-20 rounded-xl overflow-hidden border-2 transition-all hover:opacity-90 ${coverImage === photo.url ? 'border-primary ring-2 ring-primary/30' : 'border-transparent'}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.url} alt={photo.photographer} className="w-full h-full object-cover" />
+                    {coverImage === photo.url && (
+                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                        <span className="text-white text-lg">✓</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1 py-0.5">
+                      <p className="text-[8px] text-white/80 truncate">{photo.photographer}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* タブ */}
         <div className="border-b border-gray-100 px-4 sm:px-8 flex-shrink-0 bg-white sticky top-0 z-[5]">

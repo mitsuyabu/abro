@@ -1,27 +1,47 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  const isPublicPath =
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/auth') ||
-    request.nextUrl.pathname.startsWith('/api/admin/');
+export async function middleware(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({ request });
 
-  if (isPublicPath) return NextResponse.next();
-
-  // Supabaseのセッションクッキーが存在するか確認（チャンク形式 .0 .1 にも対応）
-  const hasSession = request.cookies.getAll().some(
-    (cookie) =>
-      cookie.name.startsWith('sb-') && cookie.name.includes('-auth-token')
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
   );
 
-  if (!hasSession) {
+  // トークンを自動更新（refresh tokenがあれば新しいaccess tokenを発行）
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+  const isPublicPath =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth');
+
+  // APIルートはミドルウェアでリダイレクトせず、各ルートで認証を処理する
+  const isApiRoute = pathname.startsWith('/api/');
+
+  if (!user && !isPublicPath && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  // 更新されたセッションクッキーをレスポンスに含めて返す
+  return supabaseResponse;
 }
 
 export const config = {
