@@ -38,8 +38,11 @@ const PURPOSE_LABEL: Record<string, string> = {
 };
 
 export default function PlansPage() {
+  const [activeTab, setActiveTab] = useState<'mine' | 'saved'>('mine');
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [savedPlans, setSavedPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [savedLoading, setSavedLoading] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -56,6 +59,27 @@ export default function PlansPage() {
         });
     });
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'saved') return;
+    setSavedLoading(true);
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) { setSavedLoading(false); return; }
+      const { data: saves } = await supabase
+        .from('plan_saves')
+        .select('plan_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (!saves || saves.length === 0) { setSavedPlans([]); setSavedLoading(false); return; }
+      const planIds = saves.map(s => s.plan_id);
+      const { data } = await supabase
+        .from('plans')
+        .select('id, title, destination_country, destination_city, duration_weeks, budget_jpy, budget_max_jpy, purpose, status, details, created_at')
+        .in('id', planIds);
+      setSavedPlans((data as Plan[]) ?? []);
+      setSavedLoading(false);
+    });
+  }, [activeTab]);
 
   return (
     <div className="h-full overflow-y-auto bg-white">
@@ -74,32 +98,24 @@ export default function PlansPage() {
 
         {/* タブ */}
         <div className="flex border-b border-border mb-6">
-          <button className="pb-2 px-1 mr-6 text-sm font-semibold text-primary border-b-2 border-primary">プラン</button>
-          <button className="pb-2 px-1 text-sm text-muted hover:text-primary transition-colors">共有済み</button>
+          <button
+            onClick={() => setActiveTab('mine')}
+            className={`pb-2 px-1 mr-6 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'mine' ? 'text-primary border-primary' : 'text-muted border-transparent hover:text-primary'}`}
+          >
+            マイプラン {plans.length > 0 && `(${plans.length})`}
+          </button>
+          <button
+            onClick={() => setActiveTab('saved')}
+            className={`pb-2 px-1 text-sm font-semibold transition-colors border-b-2 ${activeTab === 'saved' ? 'text-primary border-primary' : 'text-muted border-transparent hover:text-primary'}`}
+          >
+            保存済み {savedPlans.length > 0 && `(${savedPlans.length})`}
+          </button>
         </div>
 
-        {/* フィルター */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-6 rounded-full bg-gray-200 flex-shrink-0 relative cursor-not-allowed opacity-50">
-              <div className="w-4 h-4 bg-white rounded-full absolute top-1 left-1 shadow-sm" />
-            </div>
-            <span className="text-sm text-muted">予約済みのみ</span>
-          </div>
-          <select className="text-sm text-muted border border-border rounded-lg px-3 py-1.5 bg-white">
-            <option>すべて</option>
-            <option>下書き</option>
-            <option>非公開</option>
-            <option>公開中</option>
-          </select>
-        </div>
-
-        {/* グリッド */}
-        {loading ? (
+        {/* マイプランタブ */}
+        {activeTab === 'mine' && (loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="aspect-[4/3] rounded-2xl bg-gray-200 animate-pulse" />
-            ))}
+            {[1, 2, 3].map(i => <div key={i} className="aspect-[4/3] rounded-2xl bg-gray-200 animate-pulse" />)}
           </div>
         ) : plans.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-28 gap-4">
@@ -107,57 +123,73 @@ export default function PlansPage() {
               <span className="text-3xl">🧳</span>
             </div>
             <h2 className="text-lg font-semibold text-primary">まだプランがありません</h2>
-            <p className="text-muted text-sm text-center">
-              AI に相談して最初のプランを作りましょう！
-            </p>
-            <Link
-              href="/chat"
-              className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:opacity-80 transition-opacity"
-            >
+            <p className="text-muted text-sm text-center">AI に相談して最初のプランを作りましょう！</p>
+            <Link href="/chat" className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:opacity-80 transition-opacity">
               ✨ プランを作成する
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {plans.map((plan) => {
-              const duration = plan.details?.duration_label ?? (plan.duration_weeks ? `${plan.duration_weeks}週間` : null);
-              const cover = getCover(plan.destination_city);
-              const subtitle = [
-                plan.destination_city ?? plan.destination_country,
-                duration,
-                plan.purpose ? PURPOSE_LABEL[plan.purpose] : null,
-              ].filter(Boolean).join(' · ');
+          <PlanGrid plans={plans} />
+        ))}
 
-              return (
-                <Link
-                  key={plan.id}
-                  href={`/plans/${plan.id}`}
-                  className="group block rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="relative aspect-[4/3]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={cover}
-                      alt={plan.title}
-                      className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-4">
-                      <h3 className="text-white font-bold text-base leading-snug line-clamp-2">{plan.title}</h3>
-                      {subtitle && (
-                        <p className="text-white/80 text-xs mt-1">{subtitle}</p>
-                      )}
-                      <p className="text-white/50 text-[10px] mt-0.5">
-                        {new Date(plan.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+        {/* 保存済みタブ */}
+        {activeTab === 'saved' && (savedLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <div key={i} className="aspect-[4/3] rounded-2xl bg-gray-200 animate-pulse" />)}
           </div>
-        )}
+        ) : savedPlans.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-28 gap-4">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-100 to-red-100 flex items-center justify-center">
+              <span className="text-3xl">❤️</span>
+            </div>
+            <h2 className="text-lg font-semibold text-primary">保存済みのプランがありません</h2>
+            <p className="text-muted text-sm text-center">インスピレーションページの ♡ ボタンで保存できます</p>
+            <Link href="/inspiration" className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-full hover:opacity-80 transition-opacity">
+              インスピレーションを見る
+            </Link>
+          </div>
+        ) : (
+          <PlanGrid plans={savedPlans} showSavedBadge />
+        ))}
       </div>
+    </div>
+  );
+}
+
+function PlanGrid({ plans, showSavedBadge }: { plans: Plan[]; showSavedBadge?: boolean }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {plans.map((plan) => {
+        const duration = plan.details?.duration_label ?? (plan.duration_weeks ? `${plan.duration_weeks}週間` : null);
+        const cover = getCover(plan.destination_city);
+        const subtitle = [
+          plan.destination_city ?? plan.destination_country,
+          duration,
+          plan.purpose ? PURPOSE_LABEL[plan.purpose] : null,
+        ].filter(Boolean).join(' · ');
+
+        return (
+          <Link key={plan.id} href={`/plans/${plan.id}`} className="group block rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <div className="relative aspect-[4/3]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={cover} alt={plan.title} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              {showSavedBadge && (
+                <div className="absolute top-2.5 left-2.5">
+                  <span className="bg-pink-500/90 backdrop-blur-sm text-white text-[11px] font-semibold px-2 py-0.5 rounded-full">❤️ 保存済み</span>
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <h3 className="text-white font-bold text-base leading-snug line-clamp-2">{plan.title}</h3>
+                {subtitle && <p className="text-white/80 text-xs mt-1">{subtitle}</p>}
+                <p className="text-white/50 text-[10px] mt-0.5">
+                  {new Date(plan.created_at).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }
