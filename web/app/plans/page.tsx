@@ -14,7 +14,7 @@ interface Plan {
   budget_max_jpy: number | null;
   purpose: string | null;
   status: 'draft' | 'private' | 'shared' | 'public';
-  details: { duration_label?: string } | null;
+  details: { duration_label?: string; cover_image_url?: string | null } | null;
   created_at: string;
 }
 
@@ -161,7 +161,7 @@ function PlanGrid({ plans, showSavedBadge }: { plans: Plan[]; showSavedBadge?: b
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {plans.map((plan) => {
         const duration = plan.details?.duration_label ?? (plan.duration_weeks ? `${plan.duration_weeks}週間` : null);
-        const cover = getCover(plan.destination_city);
+        const cover = plan.details?.cover_image_url || getCover(plan.destination_city);
         const subtitle = [
           plan.destination_city ?? plan.destination_country,
           duration,

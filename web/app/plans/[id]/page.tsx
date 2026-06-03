@@ -61,6 +61,7 @@ interface PlanDetails {
   notes?: string[];
   saved_items?: { label: string; type: 'school' | 'city' | 'other' }[];
   ref_plans?: RefPlanItem[];
+  cover_image_url?: string | null;
 }
 
 interface Plan {
@@ -458,6 +459,9 @@ export default function PlanDetailPage() {
   const [refPlans, setRefPlans] = useState<RefPlanItem[]>([]);
   const [showRefPicker, setShowRefPicker] = useState(false);
 
+  // カバー画像
+  const [coverUploading, setCoverUploading] = useState(false);
+
   // エージェントモーダル
   const [showAgentModal, setShowAgentModal] = useState(false);
 
@@ -508,6 +512,23 @@ export default function PlanDetailPage() {
     const merged = { ...current, ...partial };
     await supabase.from('plans').update({ details: merged }).eq('id', id);
     setPlan(prev => prev ? { ...prev, details: merged } : prev);
+  };
+
+  const handleCoverUpload = async (file: File) => {
+    if (!plan || coverUploading) return;
+    setCoverUploading(true);
+    const form = new FormData();
+    form.append('file', file);
+    form.append('planId', plan.id);
+    const res = await fetch('/api/upload/plan-cover', { method: 'POST', body: form });
+    const json = await res.json() as { url?: string; error?: string };
+    if (json.url) {
+      await persistDetails({ cover_image_url: json.url });
+      fireToast('カバー画像を更新しました');
+    } else {
+      fireToast(json.error ?? 'アップロードに失敗しました');
+    }
+    setCoverUploading(false);
   };
 
   const updateTitle = async () => {
@@ -613,7 +634,7 @@ export default function PlanDetailPage() {
   }
 
   const isOwner = !!currentUser && currentUser.id === plan.user_id;
-  const cover = (plan.destination_city && CITY_COVER[plan.destination_city]) || FALLBACK_COVER;
+  const cover = plan.details?.cover_image_url || (plan.destination_city && CITY_COVER[plan.destination_city]) || FALLBACK_COVER;
   const duration = plan.details?.duration_label ?? (plan.duration_weeks ? `${plan.duration_weeks}週間` : null);
   const budgetMin = plan.budget_jpy ? Math.round(plan.budget_jpy / 10000) : null;
   const budgetMax = plan.budget_max_jpy ? Math.round(plan.budget_max_jpy / 10000) : null;
@@ -688,11 +709,24 @@ export default function PlanDetailPage() {
               <>
                 <h1 className="flex-1 text-2xl sm:text-3xl font-bold text-primary leading-snug">{plan.title}</h1>
                 {isOwner && (
-                  <button
-                    onClick={() => { setEditedTitle(plan.title); setTitleEditing(true); }}
-                    className="flex-shrink-0 mt-1 text-muted hover:text-primary transition-colors text-sm"
-                    title="タイトルを編集"
-                  >✏️</button>
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-1">
+                    <button
+                      onClick={() => { setEditedTitle(plan.title); setTitleEditing(true); }}
+                      className="text-muted hover:text-primary transition-colors text-sm"
+                      title="タイトルを編集"
+                    >✏️</button>
+                    {/* モバイル用カバー変更ボタン */}
+                    <label className={`lg:hidden text-muted hover:text-primary transition-colors text-sm cursor-pointer ${coverUploading ? 'opacity-50 pointer-events-none' : ''}`} title="カバー画像を変更">
+                      {coverUploading ? '⏳' : '🖼️'}
+                      <input
+                        type="file"
+                        accept="image/*,.heic,.heif"
+                        className="hidden"
+                        disabled={coverUploading}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = ''; }}
+                      />
+                    </label>
+                  </div>
                 )}
               </>
             )}
@@ -1086,12 +1120,27 @@ export default function PlanDetailPage() {
 
         {/* 右：渡航前準備 + 都市画像 */}
         <div className="hidden lg:flex w-80 xl:w-96 flex-shrink-0 border-l border-border flex-col">
-          {/* 都市画像 */}
-          <div className="relative h-44 flex-shrink-0">
+          {/* 都市画像（オーナーはクリックで変更可） */}
+          <div className="relative h-44 flex-shrink-0 group">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={cover} alt={plan.destination_city ?? 'プラン'} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40" />
             {plan.destination_city && <div className="absolute bottom-3 left-4 text-white font-bold text-base">{plan.destination_city}</div>}
+            {isOwner && (
+              <label className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-all ${coverUploading ? 'bg-black/40' : 'bg-black/0 group-hover:bg-black/30'}`}>
+                <div className={`flex flex-col items-center gap-1 transition-opacity ${coverUploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  <span className="text-2xl">{coverUploading ? '⏳' : '📷'}</span>
+                  <span className="text-white text-xs font-semibold">{coverUploading ? 'アップロード中...' : 'カバーを変更'}</span>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  className="hidden"
+                  disabled={coverUploading}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = ''; }}
+                />
+              </label>
+            )}
           </div>
 
           {/* 渡航前準備カードグリッド */}
