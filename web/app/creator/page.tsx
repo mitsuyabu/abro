@@ -85,6 +85,65 @@ const GUIDE_CATEGORIES: { id: GuideCategory; icon: string; title: string; desc: 
   { id: '体験', icon: '✨', title: '体験', desc: 'アクティビティ・体験談をシェアする' },
 ];
 
+// ── 写真ライブラリ（キーワードマッチング用） ──────────────────────────
+const PHOTO_LIBRARY: { url: string; credit: string; keywords: string[] }[] = [
+  // ── オーストラリア都市 ──
+  { url: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1200&q=80', credit: 'Dan Freeman', keywords: ['sydney', 'シドニー', 'australia', 'オーストラリア', 'opera'] },
+  { url: 'https://images.unsplash.com/photo-1524820801657-fd59673fbb05?w=1200&q=80', credit: 'Unsplash', keywords: ['sydney', 'シドニー', 'harbour', '港', 'australia'] },
+  { url: 'https://images.unsplash.com/photo-1545044846-351ba102b6d5?w=1200&q=80', credit: 'Denys Nevozhai', keywords: ['melbourne', 'メルボルン', 'australia', 'city', '都市'] },
+  { url: 'https://images.unsplash.com/photo-1514395462725-fb4566210144?w=1200&q=80', credit: 'Unsplash', keywords: ['melbourne', 'メルボルン', 'australia', 'オーストラリア'] },
+  { url: 'https://images.unsplash.com/photo-1589976567749-2f011d95ffec?w=1200&q=80', credit: 'Unsplash', keywords: ['brisbane', 'ブリスベン', 'australia', 'queensland'] },
+  { url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80', credit: 'Sean Oulashin', keywords: ['gold coast', 'ゴールドコースト', 'beach', 'ビーチ', 'surf', 'サーフ', 'australia', 'summer', '夏'] },
+  { url: 'https://images.unsplash.com/photo-1591701729564-3b5325d5a4bd?w=1200&q=80', credit: 'Unsplash', keywords: ['gold coast', 'ゴールドコースト', 'surfers paradise', 'australia'] },
+  { url: 'https://images.unsplash.com/photo-1598948485421-33a1655d3c18?w=1200&q=80', credit: 'Unsplash', keywords: ['cairns', 'ケアンズ', 'australia', 'reef', 'tropical', 'トロピカル', '熱帯'] },
+  // ── カナダ ──
+  { url: 'https://images.unsplash.com/photo-1560814304-4f05b62af116?w=1200&q=80', credit: 'Dan Meyers', keywords: ['vancouver', 'バンクーバー', 'canada', 'カナダ', 'bc'] },
+  { url: 'https://images.unsplash.com/photo-1517090504586-fde19ea6066f?w=1200&q=80', credit: 'Yentl Jacobs', keywords: ['toronto', 'トロント', 'canada', 'カナダ', 'ontario'] },
+  // ── イギリス ──
+  { url: 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1200&q=80', credit: 'Benjamin Davies', keywords: ['london', 'ロンドン', 'uk', 'england', 'イギリス', 'britain', 'tower bridge'] },
+  { url: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80', credit: 'Unsplash', keywords: ['edinburgh', 'エジンバラ', 'scotland', 'スコットランド', 'uk', 'イギリス', 'castle'] },
+  // ── ニュージーランド ──
+  { url: 'https://images.unsplash.com/photo-1507699622108-4be3abd695ad?w=1200&q=80', credit: 'Tobias Keller', keywords: ['auckland', 'オークランド', 'new zealand', 'ニュージーランド', 'nz'] },
+  // ── フィリピン ──
+  { url: 'https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?w=1200&q=80', credit: 'Humphrey Muleba', keywords: ['cebu', 'セブ', 'manila', 'マニラ', 'philippines', 'フィリピン', 'tropical'] },
+  // ── アイルランド ──
+  { url: 'https://images.unsplash.com/photo-1549918864-48ac978761a4?w=1200&q=80', credit: 'Unsplash', keywords: ['dublin', 'ダブリン', 'ireland', 'アイルランド'] },
+  // ── 語学学校・勉強 ──
+  { url: 'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1200&q=80', credit: 'Element5 Digital', keywords: ['school', '学校', '語学学校', 'study', '勉強', 'classroom', 'english', '英語', 'language', '留学'] },
+  { url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&q=80', credit: 'Dom Fou', keywords: ['university', '大学', 'campus', 'student', '留学', 'study abroad', 'school', '学校'] },
+  { url: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=1200&q=80', credit: 'Abbie Bernet', keywords: ['study', '勉強', 'library', '図書館', 'reading', '読書', 'student', 'school'] },
+  // ── カフェ・店舗 ──
+  { url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1200&q=80', credit: 'Nathan Dumlao', keywords: ['cafe', 'カフェ', 'coffee', 'コーヒー', '店舗', 'barista', 'latte'] },
+  { url: 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=1200&q=80', credit: 'Brooke Lark', keywords: ['cafe', 'カフェ', 'brunch', 'breakfast', '朝食', 'restaurant', 'food', '食事'] },
+  { url: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1200&q=80', credit: 'Rene Asmussen', keywords: ['cafe', 'カフェ', 'interior', 'shop', '店舗', 'bar', 'pub', 'drink'] },
+  { url: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80', credit: 'Jay Wennington', keywords: ['restaurant', 'レストラン', 'food', '食事', 'dining', '飲食', 'meal', 'グルメ'] },
+  // ── 仕事・ワーホリ ──
+  { url: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=1200&q=80', credit: 'Annie Spratt', keywords: ['work', '仕事', 'working', 'アルバイト', 'バイト', 'job', 'office', 'team'] },
+  { url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&q=80', credit: 'Todd Quackenbush', keywords: ['farm', '農場', 'farming', 'rural', '田舎', 'countryside', 'harvest', 'セカンドビザ', 'fruit picking'] },
+  // ── 体験・アクティビティ ──
+  { url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80', credit: 'Anete Lūsiņa', keywords: ['travel', '旅行', 'adventure', '体験', 'explore', 'journey', 'backpack', 'backpacker'] },
+  { url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=80', credit: 'Luca Bravo', keywords: ['nature', '自然', 'outdoor', 'mountain', '山', 'hiking', '体験', 'adventure'] },
+  { url: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&q=80', credit: 'Te lensFix', keywords: ['travel', 'abroad', '海外', 'backpack', 'working holiday', 'ワーホリ', 'life', 'freedom'] },
+  // ── 住まい ──
+  { url: 'https://images.unsplash.com/photo-1554995207-c18c203602cb?w=1200&q=80', credit: 'Sidekix Media', keywords: ['house', '家', 'share house', 'シェアハウス', 'home', 'apartment', '住まい', 'accommodation'] },
+  // ── 都市・汎用 ──
+  { url: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&q=80', credit: 'Pedro Lastra', keywords: ['city', '都市', 'urban', 'skyline', 'downtown', '場所', 'travel'] },
+];
+
+function findPhotos(title: string, location: string, category: string): { url: string; credit: string }[] {
+  const query = `${title} ${location} ${category}`.toLowerCase();
+  const scored = PHOTO_LIBRARY.map(photo => ({
+    ...photo,
+    score: photo.keywords.reduce((s, kw) => s + (query.includes(kw.toLowerCase()) ? 1 : 0), 0),
+  }));
+  // スコア降順・重複URL排除
+  const seen = new Set<string>();
+  const sorted = scored
+    .filter(p => { if (seen.has(p.url)) return false; seen.add(p.url); return true; })
+    .sort((a, b) => b.score - a.score);
+  return sorted.slice(0, 6);
+}
+
 const COVER_IMAGES: Record<string, string> = {
   'シドニー':         'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1200&q=80',
   'メルボルン':       'https://images.unsplash.com/photo-1545044846-351ba102b6d5?w=1200&q=80',
@@ -590,41 +649,28 @@ function GuideEditor({
   const [items, setItems] = useState<GuideItem[]>(config.aiDraft?.items ?? []);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // カバー画像
-  const [coverImage, setCoverImage] = useState(getCoverImage(config.location));
-  const [photoOptions, setPhotoOptions] = useState<{ id: number; url: string; photographer: string }[]>([]);
-  const [photoLoading, setPhotoLoading] = useState(false);
-  const [showPhotoSelector, setShowPhotoSelector] = useState(false);
+  // カバー画像（ライブラリから自動マッチング）
+  const initialPhotos = findPhotos(config.title, config.location, config.category ?? '');
+  const [coverImage, setCoverImage] = useState(initialPhotos[0]?.url ?? getCoverImage(config.location));
+  const [photoOptions, setPhotoOptions] = useState<{ url: string; credit: string }[]>(initialPhotos);
+  const [showPhotoSelector, setShowPhotoSelector] = useState(initialPhotos.length > 0);
 
-  const fetchPhotos = async () => {
-    setPhotoLoading(true);
+  const refreshPhotos = () => {
+    const photos = findPhotos(config.title, config.location, config.category ?? '');
+    setPhotoOptions(photos);
+    if (photos.length > 0) setCoverImage(photos[0].url);
     setShowPhotoSelector(true);
-    const params = new URLSearchParams({
-      title: config.title,
-      location: config.location,
-      category: config.category ?? '',
-    });
-    const res = await fetch(`/api/guides/cover-images?${params}`);
-    const data = await res.json() as { configured: boolean; photos?: { id: number; url: string; photographer: string }[] };
-    if (data.configured && data.photos) {
-      setPhotoOptions(data.photos);
-      if (data.photos.length > 0) setCoverImage(data.photos[0].url);
-    }
-    setPhotoLoading(false);
   };
 
   const handleRegenerate = async () => {
     setAiLoading(true);
-    // コンテンツ生成と画像取得を並行して実行
-    const [contentRes] = await Promise.all([
-      fetch('/api/guides/ai-assist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: config.category, location: config.location, title: config.title }),
-      }),
-      fetchPhotos(),
-    ]);
-    const data = await contentRes.json() as AiDraft & { error?: string };
+    refreshPhotos(); // 即時・同期（APIなし）
+    const res = await fetch('/api/guides/ai-assist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: config.category, location: config.location, title: config.title }),
+    });
+    const data = await res.json() as AiDraft & { error?: string };
     if (!data.error) {
       setOverview(data.overview ?? '');
       setSections(data.sections ?? []);
@@ -682,11 +728,10 @@ function GuideEditor({
           </div>
           {/* 写真変更ボタン */}
           <button
-            onClick={fetchPhotos}
-            disabled={photoLoading}
+            onClick={() => setShowPhotoSelector(v => !v)}
             className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 hover:bg-white transition-colors shadow"
           >
-            {photoLoading ? '⏳ 検索中...' : '📷 写真を変更'}
+            📷 写真を選ぶ
           </button>
         </div>
 
@@ -694,42 +739,29 @@ function GuideEditor({
         {showPhotoSelector && (
           <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-muted">
-                {photoLoading ? '🔍 タイトル・場所から画像を検索中...' : `📸 候補の写真（${photoOptions.length}件）`}
-              </p>
+              <p className="text-xs font-semibold text-muted">📸 タイトル・場所から選んだ候補（{photoOptions.length}件）</p>
               <button onClick={() => setShowPhotoSelector(false)} className="text-xs text-muted hover:text-primary">閉じる</button>
             </div>
-            {photoLoading ? (
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {[1,2,3,4].map(i => <div key={i} className="flex-shrink-0 w-32 h-20 bg-gray-200 rounded-xl animate-pulse" />)}
-              </div>
-            ) : photoOptions.length === 0 ? (
-              <div className="text-center py-3">
-                <p className="text-xs text-muted">Pexels API キーが未設定です</p>
-                <p className="text-[10px] text-muted mt-0.5">pexels.com/api で無料登録後、PEXELS_API_KEY を設定してください</p>
-              </div>
-            ) : (
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                {photoOptions.map(photo => (
-                  <button
-                    key={photo.id}
-                    onClick={() => { setCoverImage(photo.url); setShowPhotoSelector(false); }}
-                    className={`flex-shrink-0 relative w-32 h-20 rounded-xl overflow-hidden border-2 transition-all hover:opacity-90 ${coverImage === photo.url ? 'border-primary ring-2 ring-primary/30' : 'border-transparent'}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo.url} alt={photo.photographer} className="w-full h-full object-cover" />
-                    {coverImage === photo.url && (
-                      <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                        <span className="text-white text-lg">✓</span>
-                      </div>
-                    )}
-                    <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1 py-0.5">
-                      <p className="text-[8px] text-white/80 truncate">{photo.photographer}</p>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {photoOptions.map((photo, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setCoverImage(photo.url); setShowPhotoSelector(false); }}
+                  className={`flex-shrink-0 relative w-32 h-20 rounded-xl overflow-hidden border-2 transition-all hover:opacity-90 ${coverImage === photo.url ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-white/60'}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                  {coverImage === photo.url && (
+                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                      <span className="text-white text-lg font-bold">✓</span>
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
+                  )}
+                  <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1 py-0.5">
+                    <p className="text-[8px] text-white/70 truncate">📷 {photo.credit}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
