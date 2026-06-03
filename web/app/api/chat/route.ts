@@ -957,6 +957,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { messages } = body;
 
+    // 参照プランのコンテキスト
+    const refPlanContext: { title: string; destination: string | null; duration: string | null; purpose: string | null } | null = body.refPlanContext ?? null;
+
     // クライアントから会話状態を受け取る（なければ初期値）
     const rawInfo:  CollectedInfo      = body.collectedInfo  ?? getInitialState().collectedInfo;
     const rawPhase: ConversationPhase  = body.currentPhase   ?? 'greeting';
@@ -998,6 +1001,19 @@ export async function POST(req: Request) {
 
     const conversationPrompt = buildConversationPrompt(conversationState, scoreResults);
 
+    // 参照プランのコンテキスト追加
+    const refPlanPrompt = refPlanContext
+      ? `\n\n【参考プランについて】
+ユーザーは以下の先輩プランを参考にして、自分のプランを作りたいと相談に来ています。
+このプランの内容を踏まえながら、ユーザーの希望を丁寧にヒアリングしてください。
+最初の返答では自然に「○○のプランを参考にされているんですね」と触れてください。
+
+参考プランタイトル：${refPlanContext.title}
+渡航先：${refPlanContext.destination ?? '未定'}
+期間：${refPlanContext.duration ?? '未定'}
+目的：${refPlanContext.purpose ?? '未定'}`
+      : '';
+
     // OpenAI ストリーミング
     const stream = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -1009,7 +1025,8 @@ export async function POST(req: Request) {
           content: SYSTEM_PROMPT
             + schoolsPrompt + costPrompt + visaPrompt
             + safetyPrompt + climatePrompt + jobsPrompt
-            + conversationPrompt,
+            + conversationPrompt
+            + refPlanPrompt,
         },
         ...messages,
       ],

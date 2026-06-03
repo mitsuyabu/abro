@@ -192,7 +192,8 @@ function PlanCard({ plan }: { plan: Plan }) {
   const budgetMax = plan.budget_max_jpy ? Math.round(plan.budget_max_jpy / 10000) : null;
 
   return (
-    <Link href={`/plans/${plan.id}`} className="group block">
+    <div className="group block">
+      <Link href={`/plans/${plan.id}`} className="block">
       <div className="relative rounded-2xl overflow-hidden aspect-[239/273] bg-gray-100 mb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -237,7 +238,14 @@ function PlanCard({ plan }: { plan: Plan }) {
           </span>
         )}
       </div>
-    </Link>
+      </Link>
+      <Link
+        href={`/chat?ref=${plan.id}`}
+        className="mt-2 w-full flex items-center justify-center gap-1.5 bg-primary/10 text-primary text-xs font-semibold py-2 rounded-xl hover:bg-primary hover:text-white transition-all"
+      >
+        <span>✨</span><span>このプランを参考に作成する</span>
+      </Link>
+    </div>
   );
 }
 

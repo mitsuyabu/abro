@@ -40,6 +40,15 @@ interface YearlyMonth {
   trip?: YearlyTrip;
 }
 
+interface RefPlanItem {
+  id: string;
+  title: string;
+  destination_city: string | null;
+  destination_country: string | null;
+  duration_label?: string | null;
+  purpose?: string | null;
+}
+
 interface PlanDetails {
   duration_label?: string;
   pre_departure?: Record<string, string>;
@@ -50,6 +59,7 @@ interface PlanDetails {
   city_spots?: CitySpot[];
   notes?: string[];
   saved_items?: { label: string; type: 'school' | 'city' | 'other' }[];
+  ref_plans?: RefPlanItem[];
 }
 
 interface Plan {
@@ -102,6 +112,128 @@ function guessSpotCat(text: string): CitySpot['category'] | null {
   if (/ビーチ|公園|自然|アウトドア/.test(text))       return 'nature';
   if (/旅行|小旅行|週末|day trip/.test(text))         return 'weekend';
   return null;
+}
+
+const PURPOSE_LABEL_MAP: Record<string, string> = {
+  study: '語学留学', workingholiday: 'ワーホリ', both: '留学＋ワーホリ',
+};
+
+function RefPlanPickerModal({
+  currentPlanId,
+  addedIds,
+  onAdd,
+  onClose,
+}: {
+  currentPlanId: string;
+  addedIds: Set<string>;
+  onAdd: (plan: RefPlanItem) => void;
+  onClose: () => void;
+}) {
+  const [publicPlans, setPublicPlans] = useState<RefPlanItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from('plans')
+      .select('id, title, destination_city, destination_country, purpose, details')
+      .eq('status', 'public')
+      .neq('id', currentPlanId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setPublicPlans((data ?? []).map(p => ({
+          id: p.id,
+          title: p.title,
+          destination_city: p.destination_city,
+          destination_country: p.destination_country,
+          duration_label: (p.details as { duration_label?: string } | null)?.duration_label ?? null,
+          purpose: p.purpose,
+        })));
+        setLoading(false);
+      });
+  }, [currentPlanId]);
+
+  const filtered = publicPlans.filter(p =>
+    !search ||
+    p.title.includes(search) ||
+    (p.destination_city ?? '').includes(search) ||
+    (p.destination_country ?? '').includes(search)
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0"><div className="w-10 h-1 bg-gray-200 rounded-full" /></div>
+        <div className="px-5 py-3 border-b border-border flex-shrink-0">
+          <h2 className="text-base font-bold text-primary">参考プランを追加</h2>
+          <p className="text-[11px] text-muted mt-0.5">他のユーザーの公開プランを参考として追加できます</p>
+        </div>
+        <div className="px-5 py-3 border-b border-border flex-shrink-0">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-xs">🔍</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="都市名・タイトルで検索"
+              className="w-full border border-border rounded-xl pl-8 pr-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="py-10 flex justify-center">
+              <div className="flex gap-1">{[0,1,2].map(i => <div key={i} className="w-2 h-2 bg-primary/30 rounded-full animate-bounce" style={{ animationDelay: `${i*150}ms` }} />)}</div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-sm text-muted">{search ? '検索結果がありません' : 'まだ公開プランがありません'}</p>
+            </div>
+          ) : (
+            filtered.map(p => {
+              const isAdded = addedIds.has(p.id);
+              return (
+                <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 border-b border-border/40 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-primary truncate">{p.title}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      {(p.destination_city ?? p.destination_country) && (
+                        <span className="text-[10px] text-muted">📍 {p.destination_city ?? p.destination_country}</span>
+                      )}
+                      {p.duration_label && <span className="text-[10px] text-muted">· {p.duration_label}</span>}
+                      {p.purpose && (
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">
+                          {PURPOSE_LABEL_MAP[p.purpose] ?? p.purpose}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => !isAdded && onAdd(p)}
+                    disabled={isAdded}
+                    className={`flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
+                      isAdded
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200 cursor-default'
+                        : 'bg-primary text-white border-primary hover:opacity-80'
+                    }`}
+                  >
+                    {isAdded ? '✓ 追加済み' : '追加'}
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="px-5 py-4 border-t border-border flex-shrink-0">
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl border border-border text-sm text-muted hover:bg-gray-50 transition-colors">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SchoolDetailModal({ school, onClose }: { school: SchoolItem; onClose: () => void }) {
@@ -319,6 +451,10 @@ export default function PlanDetailPage() {
   const [allSchools, setAllSchools] = useState<SchoolItem[]>([]);
   const [focusedSchool, setFocusedSchool] = useState<SchoolItem | null>(null);
 
+  // 参考プラン
+  const [refPlans, setRefPlans] = useState<RefPlanItem[]>([]);
+  const [showRefPicker, setShowRefPicker] = useState(false);
+
   // エージェントモーダル
   const [showAgentModal, setShowAgentModal] = useState(false);
 
@@ -344,6 +480,7 @@ export default function PlanDetailPage() {
       setPlan(p);
       setNotes(p?.details?.notes ?? []);
       setSavedItems(p?.details?.saved_items ?? []);
+      setRefPlans(p?.details?.ref_plans ?? []);
       setTimelineStatus(p?.details?.timeline_status ?? {});
       setLoading(false);
     });
@@ -412,6 +549,19 @@ export default function PlanDetailPage() {
     const updated = savedItems.filter((_, i) => i !== idx);
     setSavedItems(updated);
     await persistDetails({ saved_items: updated });
+  };
+
+  const handleAddRefPlan = async (refPlan: RefPlanItem) => {
+    if (refPlans.some(r => r.id === refPlan.id)) return;
+    const updated = [...refPlans, refPlan];
+    setRefPlans(updated);
+    await persistDetails({ ref_plans: updated });
+  };
+
+  const handleRemoveRefPlan = async (refId: string) => {
+    const updated = refPlans.filter(r => r.id !== refId);
+    setRefPlans(updated);
+    await persistDetails({ ref_plans: updated });
   };
 
   const handleRegenerate = async () => {
@@ -575,10 +725,19 @@ export default function PlanDetailPage() {
           </div>
 
           {/* チャットリンク */}
-          <Link href="/chat" className="flex items-center gap-3 border border-border rounded-2xl px-4 py-3 mb-8 hover:border-primary/40 hover:bg-gray-50 transition-all group">
-            <span className="text-muted text-sm flex-1">このプランについて質問する...</span>
-            <span className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm group-hover:opacity-80 transition-opacity">→</span>
-          </Link>
+          <div className="flex flex-col gap-2 mb-8">
+            <Link href="/chat" className="flex items-center gap-3 border border-border rounded-2xl px-4 py-3 hover:border-primary/40 hover:bg-gray-50 transition-all group">
+              <span className="text-muted text-sm flex-1">このプランについて質問する...</span>
+              <span className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm group-hover:opacity-80 transition-opacity">→</span>
+            </Link>
+            <Link
+              href={`/chat?ref=${plan.id}`}
+              className="flex items-center justify-center gap-2 bg-primary text-white text-sm font-semibold py-3 rounded-2xl hover:opacity-80 transition-opacity"
+            >
+              <span>✨</span>
+              <span>このプランを参考に自分のプランを作る</span>
+            </Link>
+          </div>
 
           {/* ━━ 到着後1週間プラン ━━ */}
           {firstWeek.length > 0 && (
@@ -789,6 +948,57 @@ export default function PlanDetailPage() {
               </div>
             </div>
 
+            {/* 参考プラン */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-muted uppercase tracking-wide">参考プラン</p>
+                <button
+                  onClick={() => setShowRefPicker(true)}
+                  className="text-[11px] text-primary border border-primary/30 rounded-full px-2.5 py-1 hover:bg-primary/5 transition-colors"
+                >
+                  ＋ 追加
+                </button>
+              </div>
+              {refPlans.length === 0 ? (
+                <button
+                  onClick={() => setShowRefPicker(true)}
+                  className="w-full border border-dashed border-border rounded-2xl px-4 py-4 text-center hover:border-primary/30 hover:bg-primary/5 transition-all"
+                >
+                  <p className="text-xs text-muted">他のユーザーのプランを参考として追加</p>
+                  <p className="text-[10px] text-muted/70 mt-0.5">インスピレーションから選択できます</p>
+                </button>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {refPlans.map(ref => (
+                    <div key={ref.id} className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+                      <span className="text-lg flex-shrink-0">✨</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-primary truncate">{ref.title}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {(ref.destination_city ?? ref.destination_country) && (
+                            <span className="text-[10px] text-muted">📍 {ref.destination_city ?? ref.destination_country}</span>
+                          )}
+                          {ref.duration_label && <span className="text-[10px] text-muted">· {ref.duration_label}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Link
+                          href={`/plans/${ref.id}`}
+                          className="text-[10px] text-primary border border-primary/30 rounded-full px-2 py-1 hover:bg-primary hover:text-white transition-all"
+                        >
+                          見る →
+                        </Link>
+                        <button onClick={() => handleRemoveRefPlan(ref.id)} className="text-muted hover:text-red-400 transition-colors text-sm">✕</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={() => setShowRefPicker(true)} className="text-[11px] text-primary text-center py-1.5 hover:opacity-70 transition-opacity">
+                    ＋ さらに追加する
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* 保存済みカード */}
             <div>
               <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">保存済みカード</p>
@@ -894,6 +1104,16 @@ export default function PlanDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 参考プランピッカー */}
+      {showRefPicker && (
+        <RefPlanPickerModal
+          currentPlanId={plan.id}
+          addedIds={new Set(refPlans.map(r => r.id))}
+          onAdd={handleAddRefPlan}
+          onClose={() => setShowRefPicker(false)}
+        />
+      )}
 
       {/* 学校詳細モーダル */}
       {focusedSchool && (

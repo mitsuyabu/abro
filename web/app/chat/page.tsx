@@ -735,6 +735,9 @@ export default function ChatPage() {
   const [conversationState, setConversationState] = useState<ConversationState>(getInitialState());
   const [chatLoaded, setChatLoaded] = useState(false);
 
+  // 参考プラン
+  const [refPlan, setRefPlan] = useState<{ id: string; title: string; destination: string | null; duration: string | null; purpose: string | null } | null>(null);
+
   // 学校絞り込み条件
   const [schoolPreferences, setSchoolPreferences] = useState<Set<string>>(new Set());
   const [schoolChipsHidden, setSchoolChipsHidden] = useState(false);
@@ -950,6 +953,26 @@ export default function ChatPage() {
     }).catch(e => console.error('[Abro] schools fetch error:', e));
   }, []);
 
+  // ?ref= パラメータから参照プランを読み込む
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refId = params.get('ref');
+    if (!refId) return;
+    const supabase = createClient();
+    supabase.from('plans').select('id, title, destination_city, destination_country, purpose, details').eq('id', refId).single()
+      .then(({ data }) => {
+        if (data) {
+          setRefPlan({
+            id: data.id,
+            title: data.title,
+            destination: data.destination_city ?? data.destination_country ?? null,
+            duration: (data.details as { duration_label?: string } | null)?.duration_label ?? null,
+            purpose: data.purpose ?? null,
+          });
+        }
+      });
+  }, []);
+
   // メッセージ数が増えた時だけ最下部へスクロール
   useEffect(() => {
     if (messages.length > msgCountRef.current) {
@@ -975,6 +998,8 @@ export default function ChatPage() {
           messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           collectedInfo: conversationState.collectedInfo,
           currentPhase:  conversationState.currentPhase,
+          // 初回メッセージのみ参照プランコンテキストを渡す
+          refPlanContext: refPlan && messages.length === 0 ? refPlan : undefined,
         }),
       });
 
@@ -1202,15 +1227,29 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto bg-white">
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 px-5 sm:px-8 pt-6">
+              {/* 参照プランバナー */}
+              {refPlan && (
+                <div className="w-full max-w-md bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 flex items-center gap-3">
+                  <span className="text-2xl flex-shrink-0">✨</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-muted font-semibold">このプランを参考にします</p>
+                    <p className="text-sm font-semibold text-primary truncate">{refPlan.title}</p>
+                    <p className="text-[11px] text-muted mt-0.5">
+                      {[refPlan.destination, refPlan.duration].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  <button onClick={() => setRefPlan(null)} className="text-muted hover:text-primary transition-colors flex-shrink-0 text-sm">✕</button>
+                </div>
+              )}
               <div className="text-center gap-3 flex flex-col">
                 <div className="flex justify-center mb-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/hero.png" alt="留学イラスト" className="w-40 sm:w-64 h-auto object-contain" />
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-primary">今日は何する？</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-primary">{refPlan ? `${refPlan.destination ?? ''}のプランを参考に` : '今日は何する？'}</h1>
                 <p className="text-primary leading-relaxed text-sm sm:text-lg">
-                  AI があなたの留学・ワーホリをまるごとサポートします。<br className="hidden sm:block" />
-                  何でも気軽に聞いてみてください。
+                  {refPlan ? 'あなただけのプランを一緒に作りましょう。\nまず、渡航の希望を教えてください。' : 'AI があなたの留学・ワーホリをまるごとサポートします。'}
+                  {!refPlan && <><br className="hidden sm:block" />何でも気軽に聞いてみてください。</>}
                 </p>
               </div>
 
