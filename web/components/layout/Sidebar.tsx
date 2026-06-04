@@ -150,43 +150,62 @@ export function Sidebar() {
       </aside>
 
       {/* モバイル：下部ナビバー */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-border flex items-center justify-around z-40 px-1">
-        {BOTTOM_NAV_ITEMS.map((item) => {
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-border flex items-center justify-around z-40 px-2">
+        {/* チャット */}
+        {[
+          { href: '/chat',        icon: '/icon-chat.png',        label: 'チャット' },
+          { href: '/plans',       icon: '/icon-plan.png',        label: 'プラン' },
+        ].map((item) => {
           const active = pathname.startsWith(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors ${
-                active ? 'text-primary' : 'text-gray-400'
-              }`}
-            >
+            <Link key={item.href} href={item.href}
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors ${active ? 'text-primary' : 'text-gray-400'}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.icon}
-                alt={item.label}
-                className="w-6 h-6 object-contain"
-                style={{ mixBlendMode: 'multiply', opacity: active ? 1 : 0.5 }}
-              />
+              <img src={item.icon} alt={item.label} className="w-6 h-6 object-contain"
+                style={{ mixBlendMode: 'multiply', opacity: active ? 1 : 0.5 }} />
               <span className="text-[10px] font-medium leading-none">{item.label}</span>
             </Link>
           );
         })}
-        {/* プロフィール・アカウント */}
+
+        {/* ＋ 作成ボタン（中央・目立つ） */}
         <Link
-          href="/profile"
-          className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors ${
-            pathname.startsWith('/profile') ? 'text-primary' : 'text-gray-400'
-          }`}
+          href="/creator"
+          className={`flex flex-col items-center gap-0.5 -mt-4`}
         >
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-lg transition-all ${
+            pathname.startsWith('/creator')
+              ? 'bg-primary text-white scale-105'
+              : 'bg-primary text-white hover:opacity-80'
+          }`}>
+            ＋
+          </div>
+          <span className={`text-[10px] font-medium leading-none mt-0.5 ${pathname.startsWith('/creator') ? 'text-primary' : 'text-gray-400'}`}>作成</span>
+        </Link>
+
+        {/* インスピレーション */}
+        {[
+          { href: '/inspiration', icon: '/icon-inspiration.png', label: '発見' },
+        ].map((item) => {
+          const active = pathname.startsWith(item.href);
+          return (
+            <Link key={item.href} href={item.href}
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors ${active ? 'text-primary' : 'text-gray-400'}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.icon} alt={item.label} className="w-6 h-6 object-contain"
+                style={{ mixBlendMode: 'multiply', opacity: active ? 1 : 0.5 }} />
+              <span className="text-[10px] font-medium leading-none">{item.label}</span>
+            </Link>
+          );
+        })}
+
+        {/* アカウント */}
+        <Link href="/profile"
+          className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-colors ${pathname.startsWith('/profile') ? 'text-primary' : 'text-gray-400'}`}>
           {user?.user_metadata?.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={user.user_metadata.avatar_url}
-              alt="account"
-              className="w-6 h-6 rounded-full object-cover"
-              style={{ opacity: pathname.startsWith('/profile') ? 1 : 0.6 }}
-            />
+            <img src={user.user_metadata.avatar_url} alt="account" className="w-6 h-6 rounded-full object-cover"
+              style={{ opacity: pathname.startsWith('/profile') ? 1 : 0.6 }} />
           ) : (
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
               pathname.startsWith('/profile') ? 'bg-primary/20 text-primary' : 'bg-gray-200 text-gray-500'
