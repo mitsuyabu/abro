@@ -50,6 +50,8 @@ interface RefPlanItem {
   purpose?: string | null;
 }
 
+interface BudgetItem { label: string; amount: number | null; }
+
 interface PlanDetails {
   duration_label?: string;
   pre_departure?: Record<string, string>;
@@ -62,6 +64,7 @@ interface PlanDetails {
   saved_items?: { label: string; type: 'school' | 'city' | 'other' }[];
   ref_plans?: RefPlanItem[];
   cover_image_url?: string | null;
+  budget_breakdown?: { items: BudgetItem[]; notes?: string };
 }
 
 interface Plan {
@@ -462,6 +465,20 @@ export default function PlanDetailPage() {
   // カバー画像
   const [coverUploading, setCoverUploading] = useState(false);
 
+  // 費用内訳
+  const DEFAULT_BUDGET_ITEMS: BudgetItem[] = [
+    { label: '航空券', amount: null },
+    { label: '語学学校', amount: null },
+    { label: '宿泊費', amount: null },
+    { label: '生活費', amount: null },
+    { label: '海外保険', amount: null },
+    { label: 'ビザ申請費', amount: null },
+    { label: 'その他', amount: null },
+  ];
+  const [budgetItems, setBudgetItems] = useState<BudgetItem[]>(DEFAULT_BUDGET_ITEMS);
+  const [budgetNotes, setBudgetNotes] = useState('');
+  const [budgetSaving, setBudgetSaving] = useState(false);
+
   // エージェントモーダル
   const [showAgentModal, setShowAgentModal] = useState(false);
 
@@ -490,6 +507,10 @@ export default function PlanDetailPage() {
       setSavedItems(p?.details?.saved_items ?? []);
       setRefPlans(p?.details?.ref_plans ?? []);
       setTimelineStatus(p?.details?.timeline_status ?? {});
+      if (p?.details?.budget_breakdown) {
+        setBudgetItems(p.details.budget_breakdown.items ?? DEFAULT_BUDGET_ITEMS);
+        setBudgetNotes(p.details.budget_breakdown.notes ?? '');
+      }
       setLoading(false);
     });
   }, [id]);
@@ -512,6 +533,21 @@ export default function PlanDetailPage() {
     const merged = { ...current, ...partial };
     await supabase.from('plans').update({ details: merged }).eq('id', id);
     setPlan(prev => prev ? { ...prev, details: merged } : prev);
+  };
+
+  const handleToggleStatus = async () => {
+    if (!plan) return;
+    const newStatus = plan.status === 'public' ? 'private' : 'public';
+    await supabase.from('plans').update({ status: newStatus }).eq('id', id);
+    setPlan(prev => prev ? { ...prev, status: newStatus } : prev);
+    fireToast(newStatus === 'public' ? '🌏 プランを公開しました' : '🔒 プランを非公開にしました');
+  };
+
+  const handleSaveBudget = async () => {
+    setBudgetSaving(true);
+    await persistDetails({ budget_breakdown: { items: budgetItems, notes: budgetNotes } });
+    setBudgetSaving(false);
+    fireToast('費用を保存しました');
   };
 
   const handleCoverUpload = async (file: File) => {
@@ -668,21 +704,42 @@ export default function PlanDetailPage() {
           <span>プラン一覧</span>
         </Link>
         <div className="flex items-center gap-2">
+          {/* 公開/非公開トグル（オーナーのみ） */}
+          {isOwner && plan && (
+            <button
+              onClick={handleToggleStatus}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-all ${
+                plan.status === 'public'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              <span>{plan.status === 'public' ? '🌏' : '🔒'}</span>
+              <span className="hidden sm:inline">{plan.status === 'public' ? '公開中' : '非公開'}</span>
+            </button>
+          )}
+          {/* モバイル用カバー変更（オーナーのみ） */}
+          {isOwner && (
+            <label className={`lg:hidden flex items-center justify-center w-8 h-8 rounded-full border border-border text-muted hover:border-primary hover:text-primary transition-colors cursor-pointer ${coverUploading ? 'opacity-50 pointer-events-none' : ''}`} title="カバー画像を変更">
+              {coverUploading ? '⏳' : '🖼️'}
+              <input type="file" accept="image/*,.heic,.heif" className="hidden" disabled={coverUploading}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = ''; }} />
+            </label>
+          )}
           <button
             onClick={() => setShowAgentModal(true)}
-            className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-all"
+            className="hidden sm:flex items-center gap-1.5 text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full hover:bg-amber-100 transition-all"
           >
             <span>🎓</span>
-            <span className="hidden sm:inline">エージェントに相談</span>
-            <span className="sm:hidden">相談</span>
+            <span>エージェントに相談</span>
           </button>
           <button
             onClick={() => setShowRegenForm(v => !v)}
             className="flex items-center gap-1.5 text-sm font-semibold text-primary border border-primary/30 px-3 py-1.5 rounded-full hover:bg-primary/5 transition-all"
           >
             <span>✨</span>
-            <span className="hidden sm:inline">再提案する</span>
-            <span className="sm:hidden">再提案</span>
+            <span className="hidden sm:inline">微調整する</span>
+            <span className="sm:hidden">調整</span>
           </button>
         </div>
       </div>
@@ -863,6 +920,91 @@ export default function PlanDetailPage() {
             </div>
           )}
 
+          {/* ━━ 費用管理 ━━ */}
+          <div className="mb-8">
+            <h2 className="text-base font-bold text-primary mb-1">費用管理</h2>
+            <p className="text-xs text-muted mb-4">AI予算の目安を参考に、実際の費用を入力してください</p>
+            <div className="bg-white border border-border rounded-2xl overflow-hidden">
+              {/* AI予算目安バー */}
+              {(budgetMin || budgetMax) && (
+                <div className="px-4 py-3 bg-primary/5 border-b border-border flex items-center gap-2">
+                  <span className="text-xs text-muted">💡 AI予算目安</span>
+                  <span className="text-sm font-bold text-primary">{budgetMin}〜{budgetMax}万円</span>
+                  <button
+                    onClick={() => {
+                      const avgBudgetPerItem = Math.round(((plan?.budget_jpy ?? 0) + (plan?.budget_max_jpy ?? 0)) / 2 / 7 / 10000) * 10000;
+                      setBudgetItems(prev => prev.map(item => ({
+                        ...item,
+                        amount: item.amount ?? avgBudgetPerItem,
+                      })));
+                    }}
+                    className="ml-auto text-[10px] text-primary border border-primary/30 rounded-full px-2 py-0.5 hover:bg-primary/5 transition-colors"
+                  >
+                    目安を入力
+                  </button>
+                </div>
+              )}
+              {/* 費用項目 */}
+              <div className="divide-y divide-border">
+                {budgetItems.map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="text-xs text-muted w-24 flex-shrink-0">{item.label}</span>
+                    <div className="flex-1 flex items-center gap-1">
+                      <span className="text-xs text-muted">¥</span>
+                      <input
+                        type="number"
+                        value={item.amount ?? ''}
+                        onChange={e => setBudgetItems(prev => prev.map((it, idx) =>
+                          idx === i ? { ...it, amount: e.target.value ? parseInt(e.target.value) : null } : it
+                        ))}
+                        placeholder="0"
+                        className="flex-1 text-sm text-primary outline-none text-right placeholder:text-gray-300"
+                        disabled={!isOwner}
+                      />
+                    </div>
+                    {item.amount != null && (
+                      <span className="text-xs text-muted flex-shrink-0">
+                        ({Math.round(item.amount / 10000)}万円)
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {/* 合計 */}
+              {(() => {
+                const total = budgetItems.reduce((s, it) => s + (it.amount ?? 0), 0);
+                return total > 0 ? (
+                  <div className="px-4 py-3 bg-primary/5 border-t border-border flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted">合計</span>
+                    <span className="text-base font-bold text-primary">¥{total.toLocaleString()} <span className="text-xs font-normal text-muted">（約{Math.round(total/10000)}万円）</span></span>
+                  </div>
+                ) : null;
+              })()}
+              {/* メモ */}
+              <div className="px-4 py-3 border-t border-border">
+                <input
+                  value={budgetNotes}
+                  onChange={e => setBudgetNotes(e.target.value)}
+                  placeholder="費用メモ（例：学校は奨学金を申請予定）"
+                  className="w-full text-xs text-muted outline-none placeholder:text-gray-300"
+                  disabled={!isOwner}
+                />
+              </div>
+              {/* 保存ボタン */}
+              {isOwner && (
+                <div className="px-4 py-3 border-t border-border">
+                  <button
+                    onClick={handleSaveBudget}
+                    disabled={budgetSaving}
+                    className="w-full bg-primary/10 text-primary text-xs font-semibold py-2 rounded-xl hover:bg-primary hover:text-white transition-all disabled:opacity-40"
+                  >
+                    {budgetSaving ? '保存中...' : '費用を保存する'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* ━━ 準備タイムライン ━━ */}
           {timeline.length > 0 && (
             <div className="mb-8">
@@ -945,16 +1087,16 @@ export default function PlanDetailPage() {
           {isOwner && <div className="mb-8">
             <h2 className="text-base font-bold text-primary mb-4">メモ・カスタマイズ</h2>
 
-            {/* 再提案フォーム */}
+            {/* 微調整フォーム */}
             {showRegenForm && (
               <div className="mb-4 border border-primary/25 rounded-2xl p-4 bg-primary/5">
-                <p className="text-xs font-semibold text-primary mb-2">追加のリクエスト（任意）</p>
-                <p className="text-xs text-muted mb-2">下のメモ・保存済みカードも再提案に反映されます</p>
+                <p className="text-xs font-semibold text-primary mb-1">✨ プランを微調整する</p>
+                <p className="text-xs text-muted mb-3">変えたい点を具体的に書くと、AIがプラン全体を最適化して再生成します</p>
                 <textarea
                   value={additionalRequest}
                   onChange={e => setAdditionalRequest(e.target.value)}
-                  placeholder="例：費用をもっと抑えたい、シェアハウスに住みたい、語学学校は12週間以上希望"
-                  className="w-full text-sm border border-border rounded-xl px-3 py-2.5 outline-none focus:border-primary/40 resize-none h-20 bg-white"
+                  placeholder="例：&#10;・費用をもっと抑えたい（予算100万円以内）&#10;・シェアハウスに住みたい&#10;・語学学校は最低12週間希望&#10;・1週間プランをアウトドア中心にして"
+                  className="w-full text-sm border border-border rounded-xl px-3 py-2.5 outline-none focus:border-primary/40 resize-none h-28 bg-white"
                 />
                 <div className="flex gap-2 mt-2">
                   <button
@@ -964,10 +1106,10 @@ export default function PlanDetailPage() {
                   >
                     {isRegenerating
                       ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /><span>生成中...</span></>
-                      : '✨ この内容で再提案する'
+                      : '✨ この内容でプランを更新する'
                     }
                   </button>
-                  <button onClick={() => setShowRegenForm(false)} className="text-sm text-muted px-4 hover:text-primary">キャンセル</button>
+                  <button onClick={() => setShowRegenForm(false)} className="text-sm text-muted px-4 hover:text-primary">閉じる</button>
                 </div>
               </div>
             )}
