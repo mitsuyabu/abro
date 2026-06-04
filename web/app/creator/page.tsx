@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 // ─── Hub types ───────────────────────────────────────────────
 type HubTab = 'hub' | 'earnings';
@@ -42,11 +43,12 @@ interface GuideConfig {
 interface GuideEntry {
   id: string;
   title: string;
-  count: number;
-  countUnit: string;
+  category: string;
+  location: string;
+  cover_image: string | null;
   status: '公開中' | '下書き' | '非公開';
   statusColor: string;
-  image: string;
+  items: { id: string; name: string }[];
 }
 
 // ─── Hub data ─────────────────────────────────────────────────
@@ -60,9 +62,9 @@ const INSPIRATION_PHOTOS = [
   'https://gewdrphkuzpymfpwyndc.supabase.co/storage/v1/object/sign/city-images/photo-1591701729564-3b5325d5a4bd.avif?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV85YWQ2M2ZhNC0wZDU4LTRlODgtYWI1Zi01NDQzZDFkMWQ4OTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJjaXR5LWltYWdlcy9waG90by0xNTkxNzAxNzI5NTY0LTNiNTMyNWQ1YTRiZC5hdmlmIiwiaWF0IjoxNzc5MTc4NDI2LCJleHAiOjE4MTA3MTQ0MjZ9.dmCHZgfLr6uBg7RayDNFjybtBDTRiwXRfH6vrV0x7Is',
 ];
 
-const INITIAL_GUIDES: GuideEntry[] = [
-  { id: '1', title: 'シドニーワーホリ完全ガイド', count: 24, countUnit: 'スポット', status: '公開中', statusColor: 'bg-green-100 text-green-700', image: 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=400&q=80' },
-];
+const DB_STATUS: Record<string, GuideEntry['status']> = {
+  public: '公開中', draft: '下書き', private: '非公開',
+};
 
 const DUMMY_EARNINGS = [
   { id: '1', source: 'affiliate',      label: 'Skyscanner アフィリエイト',      amount: 3200, date: '2025-05-10', status: 'paid' },
@@ -172,43 +174,100 @@ function getCoverImage(location: string): string {
   return 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=1200&q=80';
 }
 
-function makeGuideEntry(config: GuideConfig, status: GuideEntry['status']): GuideEntry {
-  return {
-    id: Date.now().toString(),
-    title: config.title,
-    count: 0,
-    countUnit: COUNT_UNIT[config.category ?? '場所'],
-    status,
-    statusColor: STATUS_COLOR[status],
-    image: getCoverImage(config.location),
-  };
-}
-
 // ─── Main page ────────────────────────────────────────────────
 export default function CreatorPage() {
   const [activeTab, setActiveTab]   = useState<HubTab>('hub');
   const [showWizard, setShowWizard] = useState(false);
-  const [myGuides, setMyGuides]     = useState<GuideEntry[]>(INITIAL_GUIDES);
+  const [myGuides, setMyGuides]     = useState<GuideEntry[]>([]);
+  const [loading, setLoading]       = useState(true);
   const [toast, setToast]           = useState<string | null>(null);
+  const supabase = createClient();
 
   const fireToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handlePublish = (config: GuideConfig) => {
-    setMyGuides(prev => [makeGuideEntry(config, '公開中'), ...prev]);
-    setShowWizard(false);
-    setActiveTab('hub');
-    fireToast('ガイドを公開しました！');
+  const fetchGuides = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+    const { data } = await supabase
+      .from('guides')
+      .select('id, title, category, location, cover_image, status, items')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (data) {
+      setMyGuides(data.map(g => ({
+        id: g.id,
+        title: g.title,
+        category: g.category,
+        location: g.location,
+        cover_image: g.cover_image,
+        status: DB_STATUS[g.status] ?? '下書き',
+        statusColor: STATUS_COLOR[DB_STATUS[g.status] ?? '下書き'],
+        items: (g.items as { id: string; name: string }[]) ?? [],
+      })));
+    }
+    setLoading(false);
   };
 
-  const handleSaveDraft = (config: GuideConfig) => {
+  useEffect(() => { fetchGuides(); }, []);
+
+  const handlePublish = async (
+    config: GuideConfig,
+    coverImage: string,
+    overview: string,
+    sections: GuideSection[],
+    items: GuideItem[]
+  ) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { fireToast('ログインが必要です'); return; }
+    const { error } = await supabase.from('guides').insert({
+      user_id: user.id,
+      category: config.category ?? '場所',
+      layout: config.layout ?? 'list',
+      title: config.title,
+      location: config.location,
+      cover_image: coverImage || null,
+      overview,
+      sections,
+      items,
+      status: 'public',
+    });
+    if (error) { fireToast('保存に失敗しました'); return; }
+    setShowWizard(false);
+    setActiveTab('hub');
+    fireToast('ガイドを公開しました！インスピレーションに表示されます 🎉');
+    fetchGuides();
+  };
+
+  const handleSaveDraft = async (
+    config: GuideConfig,
+    coverImage: string,
+    overview: string,
+    sections: GuideSection[],
+    items: GuideItem[]
+  ) => {
     if (!config.title.trim()) { setShowWizard(false); return; }
-    setMyGuides(prev => [makeGuideEntry(config, '下書き'), ...prev]);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { fireToast('ログインが必要です'); return; }
+    const { error } = await supabase.from('guides').insert({
+      user_id: user.id,
+      category: config.category ?? '場所',
+      layout: config.layout ?? 'list',
+      title: config.title,
+      location: config.location,
+      cover_image: coverImage || null,
+      overview,
+      sections,
+      items,
+      status: 'draft',
+    });
+    if (error) { fireToast('保存に失敗しました'); return; }
     setShowWizard(false);
     setActiveTab('hub');
     fireToast('下書きとして保存しました');
+    fetchGuides();
   };
 
   const totalPaid    = DUMMY_EARNINGS.filter(e => e.status === 'paid').reduce((s, e) => s + e.amount, 0);
@@ -263,29 +322,38 @@ export default function CreatorPage() {
               </div>
 
               {/* 自分のガイド */}
-              {myGuides.length > 0 && (
-                <div className="px-6 pb-8 max-w-3xl">
-                  <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-4">あなたのガイド</h3>
+              <div className="px-6 pb-8 max-w-3xl">
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-4">あなたのガイド</h3>
+                {loading ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {myGuides.map(guide => (
-                      <div key={guide.id} className="border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
-                        <div className="relative h-28 bg-gray-100">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={guide.image} alt={guide.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                        </div>
-                        <div className="p-3">
-                          <h4 className="text-sm font-semibold text-primary line-clamp-1 mb-1">{guide.title}</h4>
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-muted">{guide.count} {guide.countUnit}</p>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${guide.statusColor}`}>{guide.status}</span>
+                    {[1,2,3].map(i => <div key={i} className="h-36 rounded-2xl bg-gray-100 animate-pulse" />)}
+                  </div>
+                ) : myGuides.length === 0 ? (
+                  <p className="text-sm text-muted text-center py-8">まだガイドがありません。作成してみましょう！</p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {myGuides.map(guide => {
+                      const coverImg = guide.cover_image || getCoverImage(guide.location);
+                      return (
+                        <div key={guide.id} className="border border-border rounded-2xl overflow-hidden hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
+                          <div className="relative h-28 bg-gray-100">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={coverImg} alt={guide.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                          </div>
+                          <div className="p-3">
+                            <h4 className="text-sm font-semibold text-primary line-clamp-1 mb-1">{guide.title}</h4>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted">📍 {guide.location || guide.category}</p>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${guide.statusColor}`}>{guide.status}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </>
           ) : (
             /* 収益ダッシュボード */
@@ -371,14 +439,16 @@ export default function CreatorPage() {
 }
 
 // ─── Wizard ───────────────────────────────────────────────────
+type EditorCallback = (config: GuideConfig, coverImage: string, overview: string, sections: GuideSection[], items: GuideItem[]) => void;
+
 function GuideWizard({
   onClose,
   onPublish,
   onSaveDraft,
 }: {
   onClose: () => void;
-  onPublish: (config: GuideConfig) => void;
-  onSaveDraft: (config: GuideConfig) => void;
+  onPublish: EditorCallback;
+  onSaveDraft: EditorCallback;
 }) {
   const [step, setStep] = useState<WizardStep>(0);
   const [config, setConfig] = useState<GuideConfig>({
@@ -640,8 +710,8 @@ function GuideEditor({
 }: {
   config: GuideConfig;
   onBack: () => void;
-  onPublish: (config: GuideConfig) => void;
-  onSaveDraft: (config: GuideConfig) => void;
+  onPublish: EditorCallback;
+  onSaveDraft: EditorCallback;
 }) {
   const [activeTab, setActiveTab] = useState<'overview' | 'map'>('overview');
   const [overview, setOverview] = useState(config.aiDraft?.overview ?? '');
@@ -708,10 +778,10 @@ function GuideEditor({
         >
           {aiLoading ? '⏳' : '✨'} AI再生成
         </button>
-        <button onClick={() => onSaveDraft(config)} className="flex-shrink-0 text-xs font-medium border border-border rounded-full px-3 py-1.5 hover:border-primary/40 transition-colors">
+        <button onClick={() => onSaveDraft(config, coverImage, overview, sections, items)} className="flex-shrink-0 text-xs font-medium border border-border rounded-full px-3 py-1.5 hover:border-primary/40 transition-colors">
           下書き
         </button>
-        <button onClick={() => onPublish(config)} className="flex-shrink-0 text-xs font-semibold bg-black text-white rounded-full px-4 py-1.5 hover:opacity-80 transition-opacity">
+        <button onClick={() => onPublish(config, coverImage, overview, sections, items)} className="flex-shrink-0 text-xs font-semibold bg-black text-white rounded-full px-4 py-1.5 hover:opacity-80 transition-opacity">
           公開する
         </button>
       </div>

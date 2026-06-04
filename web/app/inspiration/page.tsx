@@ -127,6 +127,7 @@ function AddRefToMyPlanModal({
 
 export default function InspirationPage() {
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [realGuides, setRealGuides] = useState<Guide[]>([]);
   const [savedPlanIds, setSavedPlanIds] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [myPlans, setMyPlans] = useState<{ id: string; title: string; destination_city: string | null }[]>([]);
@@ -172,7 +173,40 @@ export default function InspirationPage() {
       });
   }, []);
 
-  const filteredGuides = GUIDES.filter(g => {
+  // Supabase から公開ガイドを取得してダミーに混ぜる
+  useEffect(() => {
+    supabase
+      .from('guides')
+      .select('id, title, category, location, cover_image, items, user_id')
+      .eq('status', 'public')
+      .order('created_at', { ascending: false })
+      .then(async ({ data }) => {
+        if (!data || data.length === 0) return;
+        const userIds = [...new Set(data.map(g => g.user_id))];
+        const { data: usersData } = await supabase.from('users').select('id, nickname, phase').in('id', userIds);
+        const userMap = new Map((usersData ?? []).map(u => [u.id, u]));
+        const PHASE_MAP: Record<string, Guide['authorPhase']> = { preparing: '準備中', abroad: '渡航中', returned: '帰国済', considering: '準備中' };
+        const COUNT_UNIT_MAP: Record<string, string> = { '学校': '学校', '店舗': '店舗', '場所': 'スポット', '体験': '体験' };
+        const realGuides: Guide[] = data.map(g => ({
+          id: g.id,
+          title: g.title,
+          author: userMap.get(g.user_id)?.nickname ?? '匿名ユーザー',
+          authorPhase: PHASE_MAP[userMap.get(g.user_id)?.phase ?? 'preparing'] ?? '準備中',
+          country: g.location,
+          city: g.location,
+          category: (g.category as Guide['category']) ?? 'ガイド',
+          coverImage: g.cover_image ?? 'https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=500&q=80',
+          count: Array.isArray(g.items) ? (g.items as unknown[]).length : 0,
+          countUnit: COUNT_UNIT_MAP[g.category] ?? 'アイテム',
+        }));
+        // ダミーより前に実データを表示
+        setRealGuides(realGuides);
+      });
+  }, []);
+
+  const allGuides = [...realGuides, ...GUIDES];
+
+  const filteredGuides = allGuides.filter(g => {
     if (activeCategory === 'プラン') return false;
     if (activeCategory !== 'すべて' && activeCategory !== g.category) return false;
     if (search) {
