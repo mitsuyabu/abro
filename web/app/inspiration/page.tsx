@@ -460,28 +460,50 @@ function PlanCard({ plan, isSaved, onSave, onAddRef }: {
   );
 }
 
+const CATEGORY_BADGE: Record<string, { label: string; color: string }> = {
+  '学校': { label: '🏫 学校',  color: 'bg-blue-100 text-blue-700' },
+  '店舗': { label: '🏪 店舗',  color: 'bg-orange-100 text-orange-700' },
+  '場所': { label: '📍 場所',  color: 'bg-green-100 text-green-700' },
+  '体験': { label: '✨ 体験',  color: 'bg-purple-100 text-purple-700' },
+  'ガイド': { label: '📖 ガイド', color: 'bg-gray-100 text-gray-700' },
+};
+
 function GuideCard({ guide, isSaved, onSave }: { guide: Guide; isSaved: boolean; onSave: () => void }) {
   const detailHref = guide.guideId ? `/inspiration/guides/${guide.guideId}` : null;
-  const Wrapper = detailHref ? Link : 'div';
-  return (
-    <div className="group cursor-pointer">
-      <div className="relative rounded-2xl overflow-hidden aspect-[239/273] bg-gray-100 mb-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={guide.coverImage}
-          alt={guide.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
+  const badge = CATEGORY_BADGE[guide.category] ?? CATEGORY_BADGE['ガイド'];
 
-        {/* カウントバッジ */}
-        <div className="absolute top-2.5 left-2.5">
-          <span className="bg-black/50 backdrop-blur-sm text-white text-[11px] font-semibold px-2 py-0.5 rounded-full">
-            {guide.count} {guide.countUnit}
+  return (
+    <div className="group">
+      {/* 画像エリア：実ガイドはリンク、ダミーはそのまま */}
+      <div className="relative rounded-2xl overflow-hidden aspect-[239/273] bg-gray-100 mb-3">
+        {detailHref ? (
+          <Link href={detailHref} className="block w-full h-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={guide.coverImage} alt={guide.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+          </Link>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={guide.coverImage} alt={guide.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent pointer-events-none" />
+
+        {/* バッジ群（左上） */}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 pointer-events-none">
+          {/* カテゴリバッジ */}
+          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badge.color}`}>
+            {badge.label}
           </span>
+          {/* カウントバッジ */}
+          {guide.count > 0 && (
+            <span className="bg-black/50 backdrop-blur-sm text-white text-[11px] font-semibold px-2 py-0.5 rounded-full">
+              {guide.count} {guide.countUnit}
+            </span>
+          )}
         </div>
 
-        {/* アクションボタン */}
+        {/* アクションボタン（右上） */}
         <div className="absolute top-2.5 right-2.5 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={e => { e.stopPropagation(); onSave(); }}
@@ -492,18 +514,12 @@ function GuideCard({ guide, isSaved, onSave }: { guide: Guide; isSaved: boolean;
           >
             {isSaved ? '♥' : '♡'}
           </button>
-          <button
-            onClick={e => e.stopPropagation()}
-            className="w-8 h-8 rounded-full bg-white/90 text-gray-600 hover:bg-primary hover:text-white flex items-center justify-center text-sm transition-all shadow-md"
-            title="プランに追加"
-          >
-            ＋
-          </button>
         </div>
       </div>
 
+      {/* タイトル */}
       {detailHref ? (
-        <Link href={detailHref} className="block hover:opacity-90 transition-opacity">
+        <Link href={detailHref} className="block hover:opacity-80 transition-opacity">
           <h3 className="text-sm font-semibold text-primary leading-snug line-clamp-2 mb-1.5">{guide.title}</h3>
         </Link>
       ) : (
