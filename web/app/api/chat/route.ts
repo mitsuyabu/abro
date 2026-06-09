@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { extractInfoFromMessage, hasBasicInfo, toUserAnswers, advancePhase, getInitialState, type ConversationState, type CollectedInfo, type ConversationPhase } from "@/utils/conversationManager";
 import { rankCities, type CityRawData, type CityScoreResult } from "@/utils/scoring";
+import { rankSchools, type SchoolData, type SchoolScoreResult } from "@/utils/schoolScoring";
 import { buildConversationPrompt } from "@/utils/promptBuilder";
 
 export const dynamic = "force-dynamic";
@@ -268,7 +269,10 @@ async function fetchCostOfLivingPrompt(): Promise<string> {
   }
 }
 
-async function fetchSchoolsPrompt(): Promise<string> {
+async function fetchSchoolsPrompt(
+  userAnswers?: any,
+  targetCity?: string
+): Promise<string> {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -314,11 +318,39 @@ async function fetchSchoolsPrompt(): Promise<string> {
         })
       );
 
-      const lines = schoolsData.map((s: any) => {
+      // スコアリング実行（ユーザー条件がある場合）
+      let rankedSchools = schoolsData;
+      if (userAnswers) {
+        const scoreResults = rankSchools(schoolsData as SchoolData[], userAnswers, targetCity);
+        // スコア情報を元のデータに追加
+        rankedSchools = scoreResults.map(result => {
+          const school = schoolsData.find(s => s.school_id === result.school_id);
+          return {
+            ...school,
+            _score: result.totalScore,
+            _rank: result.rank,
+            _matchReasons: result.matchReasons,
+            _breakdown: result.breakdown
+          };
+        });
+      }
+
+      const lines = rankedSchools.map((s: any) => {
         const JPY = 95; // 1AUD = 95円
 
         // 基本情報
-        let info = `### ${s.name}${s.name_ja ? `（${s.name_ja}）` : ''}\n`;
+        let info = `### ${s.name}${s.name_ja ? `（${s.name_ja}）` : ''}`;
+
+        // スコア情報があれば表示
+        if (s._rank && s._score) {
+          info += ` [第${s._rank}位 - スコア${s._score}点]\n`;
+          if (s._matchReasons && s._matchReasons.length > 0) {
+            info += `✨ マッチ理由: ${s._matchReasons.slice(0, 3).join('、')}\n`;
+          }
+        } else {
+          info += `\n`;
+        }
+
         info += `📍 都市: ${s.city}（${s.country}）${s.area ? ` - ${s.area}` : ''}\n`;
 
         // 料金情報
@@ -1110,8 +1142,9 @@ export async function POST(req: Request) {
     };
 
     // Supabase データ取得 + 会話フェーズプロンプトを並行構築
+    const userAnswers = toUserAnswers(conversationState.collectedInfo);
     const [schoolsPrompt, costPrompt, visaPrompt, safetyPrompt, climatePrompt, jobsPrompt] = await Promise.all([
-      fetchSchoolsPrompt(),
+      fetchSchoolsPrompt(userAnswers, conversationState.proposedCity || undefined),
       fetchCostOfLivingPrompt(),
       fetchVisaInfoPrompt(),
       fetchCitySafetyPrompt(),
