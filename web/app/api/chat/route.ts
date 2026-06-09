@@ -274,13 +274,133 @@ async function fetchSchoolsPrompt(): Promise<string> {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    const { data } = await supabase.from("schools").select("name, city, country, type, fee_per_week, description, website, is_partner");
+
+    // 詳細データがある学校（school_id があるもの）を優先的に取得
+    const { data: detailedSchools } = await supabase
+      .from("schools")
+      .select("*")
+      .not('school_id', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (detailedSchools && detailedSchools.length > 0) {
+      // 詳細データがある学校のプロンプト生成
+      const schoolsData = await Promise.all(
+        detailedSchools.map(async (school: any) => {
+          // コース情報取得
+          const { data: courses } = await supabase
+            .from('school_courses')
+            .select('*')
+            .eq('school_id', school.school_id)
+            .order('price_per_week_aud', { ascending: true });
+
+          // ラベル取得
+          const { data: labels } = await supabase
+            .from('school_labels')
+            .select('label')
+            .eq('school_id', school.school_id);
+
+          // 宿泊施設取得
+          const { data: accommodation } = await supabase
+            .from('school_accommodation')
+            .select('*')
+            .eq('school_id', school.school_id);
+
+          return {
+            ...school,
+            courses: courses || [],
+            labels: (labels || []).map((l: any) => l.label),
+            accommodation: accommodation?.[0] || null
+          };
+        })
+      );
+
+      const lines = schoolsData.map((s: any) => {
+        const JPY = 95; // 1AUD = 95円
+
+        // 基本情報
+        let info = `### ${s.name}${s.name_ja ? `（${s.name_ja}）` : ''}\n`;
+        info += `📍 都市: ${s.city}（${s.country}）${s.area ? ` - ${s.area}` : ''}\n`;
+
+        // 料金情報
+        if (s.price_min_aud && s.price_max_aud) {
+          info += `💰 料金: 週${s.price_min_aud}〜${s.price_max_aud}AUD（約${Math.round(s.price_min_aud * JPY).toLocaleString()}〜${Math.round(s.price_max_aud * JPY).toLocaleString()}円）\n`;
+        }
+        if (s.enrollment_fee_aud) {
+          info += `   入学金: ${s.enrollment_fee_aud}AUD（約${Math.round(s.enrollment_fee_aud * JPY).toLocaleString()}円）\n`;
+        }
+
+        // コース情報
+        if (s.courses.length > 0) {
+          info += `\n📚 コース:\n`;
+          s.courses.forEach((c: any) => {
+            const price = `${c.price_per_week_aud}AUD/週（約${Math.round(c.price_per_week_aud * JPY).toLocaleString()}円）`;
+            const recommended = c.recommended ? ' ⭐推奨' : '';
+            const timeSlot = c.time_slot ? ` [${c.time_slot}]` : '';
+            info += `   - ${c.name}（${c.name_short}）: ${price}${timeSlot}${recommended}\n`;
+            if (c.schedule) info += `     時間: ${c.schedule}\n`;
+          });
+        }
+
+        // 学校特徴
+        const features = [];
+        if (s.japanese_ratio != null) features.push(`日本人比率${Math.round(s.japanese_ratio * 100)}%`);
+        if (s.total_students) features.push(`生徒数${s.total_students}名`);
+        if (s.support_job) features.push('就職サポートあり');
+        if (s.support_japanese) features.push('日本語サポートあり');
+        if (s.support_accommodation) features.push('住居サポートあり');
+        if (s.accredited) features.push('認定校');
+
+        if (features.length > 0) {
+          info += `\n✨ 特徴: ${features.join('、')}\n`;
+        }
+
+        // ラベル（タグ）
+        if (s.labels.length > 0) {
+          info += `🏷️ タグ: ${s.labels.join(', ')}\n`;
+        }
+
+        // 宿泊施設
+        if (s.accommodation) {
+          const acc = s.accommodation;
+          info += `\n🏠 宿泊施設: ${acc.type}（${acc.room_type}）\n`;
+          info += `   料金: ${acc.price_per_week_aud}AUD/週（約${Math.round(acc.price_per_week_aud * JPY).toLocaleString()}円）\n`;
+          info += `   食事: ${acc.meal_plan}\n`;
+        }
+
+        // 学校概要
+        if (s.school_summary) {
+          info += `\n📝 概要: ${s.school_summary}\n`;
+        }
+
+        return info;
+      }).join("\n");
+
+      return `\n\n# 提案可能な語学学校リスト（詳細データあり）
+
+以下の学校は詳細なコース情報・料金データがあります。
+学校を提案する際は、ユーザーの条件（予算・目的・サポート・環境）に合わせて具体的に紹介してください。
+
+${lines}
+
+**提案時の重要ルール**：
+1. 予算重視のユーザーには最安コースを提示すること
+2. 就職サポートが必要なユーザーには support_job: true の学校を優先すること
+3. 日本人比率を気にするユーザーには具体的な数値を伝えること
+4. 複数コースがある場合は、ユーザーの目的（一般英語、IELTS、ビジネス等）に合ったコースを提案すること
+5. 働きながら学びたいユーザーには evening（夜間）コースを提案すること
+
+上記以外の学校名は作らないこと。`;
+    }
+
+    // 詳細データがない場合は基本データのみ
+    const { data } = await supabase.from("schools").select("name, city, country, type, website, is_partner");
     if (!data || data.length === 0) return "";
-    const lines = data.map((s: { name: string; city: string; type: string; fee_per_week: number | null; description: string | null; website: string | null; is_partner: boolean }) =>
-      `- ${s.name}（${s.city}）: ${s.type}、週約¥${s.fee_per_week?.toLocaleString() ?? "要問合せ"}、${s.is_partner ? "提携校" : "非提携校"}。${s.description ?? ""}`
+    const lines = data.map((s: { name: string; city: string; type: string; website: string | null; is_partner: boolean }) =>
+      `- ${s.name}（${s.city}）: ${s.type}、${s.is_partner ? "提携校" : "非提携校"}`
     ).join("\n");
-    return `\n\n# 提案可能な語学学校リスト\n以下の学校をプランニング・提案に使用してください。\n学校を提案する際は必ずこのリストから具体的な学校名を挙げ、ユーザーの条件に合う理由とともに紹介してください。リストにない学校名は絶対に作らないこと。\n\n${lines}\n\n上記以外の学校名を回答に含めることは禁止です。`;
-  } catch {
+    return `\n\n# 提案可能な語学学校リスト\n以下の学校をプランニング・提案に使用してください。\n\n${lines}`;
+  } catch (error) {
+    console.error('[fetchSchoolsPrompt error]', error);
     return "";
   }
 }
